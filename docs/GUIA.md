@@ -84,7 +84,9 @@ npx supabase functions deploy ia --no-verify-jwt
 ## 4. La app en tu dominio (Cloudflare Pages)
 
 1. Completá `web/config.js` con la **Project URL** y la clave pública del paso 1.
-2. Creá una cuenta en <https://dash.cloudflare.com> › **Workers & Pages › Create application** y elegí la pestaña **Pages** (no Workers).
+2. Creá una cuenta en <https://dash.cloudflare.com> › **Workers & Pages › Create application**.
+   - Si Cloudflare lo crea como **Worker** conectado a GitHub (lo que pasa hoy por defecto), está bien: `wrangler.jsonc` en la raíz del repo hace que publique solo `web/`. El comando de implementación tiene que ser `npx wrangler deploy` y el dominio se agrega en la pestaña **Dominios** › **Dominio personalizado**.
+   - Si preferís **Pages**, elegí esa pestaña y seguí el paso 3.
 3. Elegí una de dos formas (no se puede cambiar de una a otra después):
    - **Subir la carpeta** (lo más simple): **Upload assets**, ponele nombre al proyecto y arrastrá la carpeta `web`.
    - **Conectar GitHub** (recomendado si vas a seguir con Claude Code): **Connect to Git**, elegí el repositorio, preset **None**, comando de build vacío y carpeta de salida `web`. Cada cambio que se sube a GitHub se publica solo.
