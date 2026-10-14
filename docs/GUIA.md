@@ -18,17 +18,22 @@ Tiempo estimado: 1 a 2 horas la primera vez. Todo se hace una sola vez; después
 ## 1. Supabase: base de datos y usuarios
 
 1. Entrá a <https://supabase.com>, creá una cuenta y un proyecto nuevo.
-   - **Región:** São Paulo (`sa-east-1`), la más cercana a Uruguay.
+   - **Región:** elegí la región específica **South America (São Paulo)**, `sa-east-1`. La opción general "América" cae en EE. UU. y la región no se cambia después.
    - Guardá en un lugar seguro la contraseña de la base de datos.
-2. En el proyecto, abrí **SQL Editor**, pegá todo el contenido de `supabase/migrations/20261013000000_base.sql` y tocá **Run**. Tiene que terminar sin errores.
-3. Abrí **Project Settings › API** y anotá:
-   - **Project URL** (ej. `https://abcd1234.supabase.co`)
-   - **anon public key** (una clave larga que empieza con `eyJ`). Es pública por diseño: la seguridad la dan las reglas de la base de datos.
-   - **service_role key**: esta **no** se comparte ni se pone en la app. Solo la usa el servidor, y Supabase la carga sola en la función.
+   - Dejá marcados **Habilitar Data API** y **Exponer automáticamente nuevas tablas** (las migraciones cuentan con eso) y marcá **Activar RLS automático**.
+2. Aplicá **todas** las migraciones de `supabase/migrations/`, en orden y **por una sola vía** (si se aplica dos veces, falla):
+   - Con la terminal (recomendado): `npx supabase link --project-ref TU_REF` y `npx supabase db push`.
+   - O a mano: en **SQL Editor** pegá cada archivo, en orden, y tocá **Run**. Después no uses `db push` sin antes marcar esas migraciones como aplicadas (`npx supabase migration repair --status applied <número>`).
+3. Abrí **Project Settings › API Keys** (o el botón **Connect**) y anotá:
+   - **Project URL** (ej. `https://abcd1234.supabase.co`).
+   - La clave pública: **publishable** (`sb_publishable_...`) en proyectos nuevos, o **anon** (`eyJ...`) en los viejos. Es pública por diseño: la seguridad la dan las reglas de la base de datos.
+   - La clave **secret** / **service_role** **no** se comparte ni se pone en la app. Supabase la carga sola en la función.
+
+> Los espacios nuevos nacen en el plan **Prueba (sin IA)**. Para darle IA a uno, cambiale `plan_id` en **Table Editor › espacios** (ver *Administración*).
 
 ### Inicio de sesión con código por mail
 
-4. **Authentication › Sign In / Providers › Email**: dejá activado Email. Se puede desactivar "Confirm email", porque el código ya confirma el mail.
+4. **Authentication › Sign In / Providers › Email**: dejá activado Email y **desactivá "Confirm email"** (el código ya confirma el mail; si queda activo, a la gente nueva le puede llegar un link en vez del código). Por las dudas, poné `{{ .Token }}` también en la plantilla **Confirm signup**.
 5. **Authentication › Email Templates › Magic Link**: reemplazá el contenido por algo así (lo importante es `{{ .Token }}`):
 
    ```html
@@ -37,19 +42,19 @@ Tiempo estimado: 1 a 2 horas la primera vez. Todo se hace una sola vez; después
    <p>Vence en una hora. Si no lo pediste, ignorá este mail.</p>
    ```
    Asunto sugerido: `Tu código para entrar`.
-6. **Authentication › URL Configuration**: en **Site URL** poné la dirección final de la app (ej. `https://app.tudominio.com`) y agregala también en **Redirect URLs**.
+6. **Authentication › URL Configuration**: en **Site URL** poné la dirección final de la app (ej. `https://app.tudominio.com`) y en **Redirect URLs** agregá `https://app.tudominio.com/` y `https://app.tudominio.com/**`.
 
 ### Mails de verdad (obligatorio)
 
 El servicio de mail que trae Supabase **solo le manda a las personas del equipo del proyecto y como máximo 2 mails por hora**. Para que Clara (y después los clientes) reciban el código, hay que conectar un servicio propio:
 
 7. Creá una cuenta en <https://resend.com> (plan gratis: 3.000 mails por mes, 100 por día).
-8. En Resend, agregá tu dominio y cargá los registros DNS que te indica en el lugar donde administrás el dominio. Esto evita que los mails caigan en spam.
-9. Creá una **API key** en Resend.
-10. En Supabase, **Authentication › Emails › SMTP Settings**: activá **Custom SMTP** con:
+8. En Resend, **Domains › Add domain** con un **subdominio de envío** (ej. `mail.tudominio.com`): así no se tocan los registros de mail del dominio principal. Si el dominio está en Cloudflare, el botón **Sign in to Cloudflare** carga los registros solo; si no, cargalos a mano (MX y TXT, en Cloudflare siempre "DNS only"). Esperá a que diga **Verified**.
+9. Creá una **API key** en Resend con permiso "Sending access" para ese dominio.
+10. En Supabase, **Authentication › Email (Notifications) › SMTP Settings**: activá **Custom SMTP** con:
     - Host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña: la API key de Resend.
-    - Remitente: `no-responder@tudominio.com`, nombre: `Plato y Pulso`.
-11. En **Authentication › Rate Limits** podés subir el límite de mails por hora si hace falta.
+    - Remitente: `no-responder@mail.tudominio.com`, nombre: `Plato y Pulso`.
+11. **Authentication › Rate Limits**: al activar SMTP propio el límite baja a 30 mails por hora; subilo a 60–100 (el plan gratis de Resend corta en 100 por día).
 
 ---
 
@@ -68,20 +73,22 @@ npx supabase login
 npx supabase link --project-ref TU_REF          # el código que aparece en la URL del proyecto
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 npx supabase secrets set ORIGENES_PERMITIDOS=https://app.tudominio.com
-npx supabase functions deploy ia
+npx supabase functions deploy ia --no-verify-jwt
 ```
 
-- `ORIGENES_PERMITIDOS` hace que la función solo responda a tu app. Si lo dejás vacío, responde a cualquier página, aunque igual exige una sesión válida.
+- `--no-verify-jwt` hace falta con las claves nuevas de Supabase (`sb_publishable_...`). Es seguro: la función valida la sesión de cada pedido por su cuenta.
+- `ORIGENES_PERMITIDOS` hace que la función solo responda a tu app (exacto, sin barra final). Si lo dejás vacío, responde a cualquier página, aunque igual exige una sesión válida.
+- No cargues secretos que empiecen con `SUPABASE_`: esos los pone Supabase.
 - Opcionales: `MODELO_RAPIDO` (por defecto `claude-haiku-5-5`), `MODELO_RECETAS` (por defecto `claude-sonnet-5-5`) y `MAX_LLAMADAS_5MIN` (por defecto 40 por persona).
 
 ## 4. La app en tu dominio (Cloudflare Pages)
 
-1. Completá `web/config.js` con la **Project URL** y la **anon public key** del paso 1.
-2. Creá una cuenta en <https://dash.cloudflare.com> › **Workers & Pages › Create › Pages**.
-3. Elegí una de dos formas:
+1. Completá `web/config.js` con la **Project URL** y la clave pública del paso 1.
+2. Creá una cuenta en <https://dash.cloudflare.com> › **Workers & Pages › Create application** y elegí la pestaña **Pages** (no Workers).
+3. Elegí una de dos formas (no se puede cambiar de una a otra después):
    - **Subir la carpeta** (lo más simple): **Upload assets**, ponele nombre al proyecto y arrastrá la carpeta `web`.
-   - **Conectar GitHub** (recomendado si vas a seguir con Claude Code): elegí el repositorio, sin comando de build, y como carpeta de salida `web`. Cada cambio que se sube a GitHub se publica solo.
-4. En el proyecto de Pages: **Custom domains › Set up a custom domain** › `app.tudominio.com`. Si tu dominio no está en Cloudflare, te indica un registro **CNAME** para cargar en tu proveedor de dominio.
+   - **Conectar GitHub** (recomendado si vas a seguir con Claude Code): **Connect to Git**, elegí el repositorio, preset **None**, comando de build vacío y carpeta de salida `web`. Cada cambio que se sube a GitHub se publica solo.
+4. En el proyecto de Pages: **Custom domains › Set up a custom domain** › `app.tudominio.com`. Si el dominio está en Cloudflare, el registro se crea solo: **no lo crees a mano antes**. Si no está en Cloudflare, te indica un **CNAME** para cargar en tu proveedor.
 5. Abrí `https://app.tudominio.com`. Tiene que aparecer la pantalla para entrar con tu mail.
 
 ## 5. Primer uso
@@ -99,7 +106,7 @@ npx supabase functions deploy ia
 
 En Supabase › **Table Editor**:
 
-- **`espacios`**: cambiá `plan_id` (`piloto`, `hogar`, `profesional`, `gimnasio`) o `estado` (`activo` o `suspendido`). Un espacio suspendido puede ver sus datos, pero no cargar nuevos ni usar IA. Sirve para cuando no paga.
+- **`espacios`**: cambiá `plan_id` (`prueba`, `piloto`, `hogar`, `profesional`, `gimnasio`), `plan_vence` o `estado` (`activo` o `suspendido`). Todo espacio nuevo nace en `prueba` (sin IA): pasalo a otro plan para activarle la IA. Un espacio suspendido, o con `plan_vence` pasado, no puede usar IA; suspendido tampoco puede cargar ni borrar datos, pero sí verlos. Sirve para cuando no paga.
 - **`planes`**: cantidad máxima de personas, tope de gasto de IA por mes, si incluye fotos y precio de referencia.
 - **`admin_resumen`** (vista): por espacio, cuántas personas activas tiene, cuánto gastó en IA este mes y la última actividad. Es tu tablero para facturar.
 - **`uso_ia`**: cada consulta a la IA, con sus tokens y su costo exacto.

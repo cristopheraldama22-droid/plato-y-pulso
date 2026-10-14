@@ -104,11 +104,44 @@ select set_config('request.jwt.claim.sub', :'extra', false);
 \echo '-- Usuario externo no ve espacios ni docs (esperado 0 / 0):'
 select (select count(*) from public.espacios) as espacios, (select count(*) from public.docs) as docs;
 do $$ begin
-  perform public.unirse_con_codigo('NOEXISTE','X');
-  raise exception 'FALLO: código inválido aceptado';
-exception when others then
-  if sqlerrm = 'codigo_invalido' then raise notice 'OK: código inválido rechazado'; else raise; end if;
+  if public.unirse_con_codigo('NOEXISTE','X') is not null then raise exception 'FALLO: código inválido aceptado'; end if;
+  raise notice 'OK: código inválido rechazado';
 end $$;
+-- Tope de intentos fallidos (10 por hora)
+do $$ declare i int; begin
+  for i in 1..9 loop perform public.unirse_con_codigo('NOEXISTE' || i, 'X'); end loop;
+  begin
+    perform public.unirse_con_codigo('OTRO', 'X');
+    raise exception 'FALLO: sin tope de intentos';
+  exception when others then
+    if sqlerrm = 'muchos_intentos' then raise notice 'OK: tope de intentos de código'; else raise; end if;
+  end;
+end $$;
+-- El dueño no puede abrir los datos de un gimnasio
+select set_config('request.jwt.claim.sub', :'profe', false);
+do $$ begin
+  begin
+    update public.espacios set datos_compartidos = true;
+    raise exception 'FALLO: el dueño pudo compartir los datos del gimnasio';
+  exception when insufficient_privilege then raise notice 'OK: no se puede cambiar datos_compartidos';
+  end;
+end $$;
+-- Quitado y de vuelta: entra como miembro, no con su rol anterior (socio 1 era profesional)
+select public.quitar_miembro((select v from r where k='m_s1')::uuid);
+\echo '-- Al quitar a alguien cambia el código (esperado true):'
+select public.codigo_de((select v from r where k='gym')::uuid) <> (select v from r where k='codigo_gym') as codigo_nuevo;
+insert into r select 'codigo_gym2', public.codigo_de((select v from r where k='gym')::uuid);
+select set_config('request.jwt.claim.sub', :'socio1', false);
+do $$ begin
+  if public.unirse_con_codigo((select v from r where k='codigo_gym'), 'Socio Uno') is not null then
+    raise exception 'FALLO: entró con el código viejo';
+  end if;
+  raise notice 'OK: el código viejo ya no sirve';
+end $$;
+select public.unirse_con_codigo((select v from r where k='codigo_gym2'), 'Socio Uno') is not null as volvio;
+\echo '-- Socio 1 volvió como miembro (esperado miembro):'
+select rol from public.miembros where id = (select v from r where k='m_s1')::uuid;
+select set_config('request.jwt.claim.sub', :'extra', false);
 \echo '-- Estado de IA no se revela a externos (esperado 0 filas):'
 select count(*) from public.estado_ia((select v from r where k='hogar')::uuid);
 
@@ -136,6 +169,11 @@ do $$ begin
   if found then raise exception 'FALLO: escribió en un espacio suspendido'; end if;
   raise notice 'OK: sin cambios en espacio suspendido';
 exception when insufficient_privilege then raise notice 'OK: no puede escribir en un espacio suspendido';
+end $$;
+do $$ begin
+  delete from public.docs where doc_id = 'hogar_despensa';
+  if found then raise exception 'FALLO: borró en un espacio suspendido'; end if;
+  raise notice 'OK: no puede borrar en un espacio suspendido';
 end $$;
 \echo '-- Pero puede seguir leyendo sus datos (esperado 2):'
 select count(*) from public.docs where espacio_id = (select v from r where k='hogar')::uuid;

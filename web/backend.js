@@ -9,7 +9,7 @@
 
 class ErrorApp extends Error{constructor(codigo,mensaje){super(mensaje||codigo);this.codigo=codigo}}
 const MSG={
-  sin_sesion:"Volvé a iniciar sesión.",codigo_invalido:"Ese código no existe. Revisalo con quien te invitó.",espacio_lleno:"Ese espacio llegó al máximo de personas de su plan.",
+  sin_sesion:"Volvé a iniciar sesión.",codigo_invalido:"Ese código no existe. Revisalo con quien te invitó.",espacio_lleno:"Ese espacio llegó al máximo de personas de su plan.",muchos_intentos:"Demasiados códigos equivocados. Probá de nuevo en una hora.",
   limite_espacios:"Llegaste al máximo de espacios que podés crear.",sin_permiso:"No tenés permiso para hacer eso.",ultimo_dueno:"El espacio tiene que tener al menos un dueño.",
   tope_plan:"Se usó todo el cupo de IA del plan este mes.",plan_sin_foto:"Tu plan no incluye estimar desde fotos.",muchas_llamadas:"Muchas consultas seguidas. Esperá unos minutos.",
   ia_ocupada:"La IA está ocupada. Probá en un rato.",ia_no_disponible:"No se pudo contactar a la IA.",red:"Sin conexión. Se guarda cuando vuelva la señal."
@@ -30,7 +30,7 @@ function nube(cfg){
     async salir(){await sb.auth.signOut()},
     misEspacios:()=>rpc("mis_espacios"),
     crearEspacio:(nombre,tipo,miNombre)=>rpc("crear_espacio",{p_nombre:nombre,p_tipo:tipo,p_mi_nombre:miNombre}),
-    unirse:(codigo,miNombre)=>rpc("unirse_con_codigo",{p_codigo:codigo,p_mi_nombre:miNombre}),
+    async unirse(codigo,miNombre){const id=await rpc("unirse_con_codigo",{p_codigo:codigo,p_mi_nombre:miNombre});if(!id)throw new ErrorApp("codigo_invalido",MSG.codigo_invalido);return id},
     async miembros(e){const {data,error}=await sb.from("miembros").select("id,nombre,rol,activo,user_id").eq("espacio_id",e).eq("activo",true).order("creado_en");if(error)throw errDe(error);return data},
     codigo:(e)=>rpc("codigo_de",{e}),
     regenerarCodigo:(e)=>rpc("regenerar_codigo",{e}),
@@ -107,7 +107,9 @@ function demo(){
 window.PPBackend={
   crear(cfg){
     const q=new URLSearchParams(location.search);
-    if(q.has("demo")||cfg.demo||!cfg.supabaseUrl||!cfg.supabaseAnonKey||!window.supabase)return demo();
+    if(q.has("demo")||cfg.demo||!cfg.supabaseUrl||!cfg.supabaseAnonKey)return demo();
+    // Con la nube configurada nunca caer en demo sin avisar: los datos quedarían solo en este navegador.
+    if(!window.supabase)throw new ErrorApp("red","No se pudo cargar la app. Revisá la conexión y volvé a abrirla.");
     return nube(cfg);
   },
   ErrorApp

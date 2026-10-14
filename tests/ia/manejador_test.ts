@@ -13,8 +13,9 @@ function deps(over: Partial<Deps> & { respuesta?: string; status?: number } = {}
     miembro: async () => ({ rol: "miembro" }),
     estado: async () => ({ gastado: 0.1, tope: 3, foto: true, activo: true }),
     llamadasRecientes: async () => 0,
-    registrar: async (f) => { registros.push(f); },
-    claude: async (p) => { pedidos.push(p); return { status: over.status ?? 200, texto: over.respuesta ?? '{"kcal":520,"prot":38,"veg":1.5,"ultra":false,"nota":"plato normal"}', entrada: 400, salida: 80 }; },
+    reservar: async (f) => { registros.push({ ...f }); return registros.length - 1; },
+    cerrar: async (id, c) => { Object.assign(registros[Number(id)], c); },
+    claude: async (p) => { pedidos.push({ ...p, reservados: registros.length }); return { status: over.status ?? 200, texto: over.respuesta ?? '{"kcal":520,"prot":38,"veg":1.5,"ultra":false,"nota":"plato normal"}', entrada: 400, salida: 80 }; },
     ...over,
   };
   return { d, registros, pedidos };
@@ -76,7 +77,9 @@ Deno.test("tarea desconocida o espacio mal formado → 400", async () => {
 
 Deno.test("origen no permitido → 403; preflight CORS ok", async () => {
   const { d } = deps({ origenes: ["https://app.ejemplo.uy"] });
-  assertEquals((await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }, "ok", "https://otro.com"), d)).status, 403);
+  const otro = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }, "ok", "https://otro.com"), d);
+  assertEquals(otro.status, 403);
+  assertEquals(otro.headers.get("Access-Control-Allow-Origin"), null);
   const pre = await manejar(new Request("https://x", { method: "OPTIONS", headers: { origin: "https://app.ejemplo.uy" } }), d);
   assertEquals(pre.headers.get("Access-Control-Allow-Origin"), "https://app.ejemplo.uy");
 });
@@ -130,6 +133,42 @@ Deno.test("lote y compra: interpreta arrays y categorías", async () => {
 
 Deno.test("extraerJSON tolera texto alrededor", () => {
   assertEquals(extraerJSON('Claro: {"a":1} listo'), { a: 1 });
+});
+
+Deno.test("reserva el costo máximo antes de llamar a Claude y después lo ajusta", async () => {
+  const { d, registros, pedidos } = deps();
+  await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "milanesa" } }), d);
+  assertEquals((pedidos[0] as { reservados: number }).reservados, 1);
+  assertEquals(registros[0].ok, true);
+  assertEquals(registros[0].tokens_salida, 80);
+});
+
+Deno.test("pensamiento apagado: Haiku con disabled, Sonnet con between_tools", async () => {
+  const { d, pedidos } = deps();
+  await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "milanesa" } }), d);
+  assertEquals((pedidos[0] as { thinking: unknown }).thinking, { type: "disabled" });
+  const { d: d2, pedidos: p2 } = deps({ respuesta: "[]" });
+  await manejar(pedir({ espacio_id: ESP, tarea: "recetas", datos: {} }), d2);
+  assertEquals((p2[0] as { thinking: unknown }).thinking, { type: "between_tools" });
+});
+
+Deno.test("si la base falla al leer el gasto: no llama a la IA y responde con CORS", async () => {
+  const { d, pedidos } = deps({ estado: () => Promise.reject(new Error("db caída")), origenes: ["https://app.ejemplo.uy"] });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d);
+  assertEquals(r.status, 500); assertEquals(pedidos.length, 0);
+  assertEquals(r.headers.get("Access-Control-Allow-Origin"), "https://app.ejemplo.uy");
+});
+
+Deno.test("si no se puede reservar el uso: no llama a la IA", async () => {
+  const { d, pedidos } = deps({ reservar: () => Promise.reject(new Error("insert falló")) });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d);
+  assertEquals(r.status, 500); assertEquals(pedidos.length, 0);
+});
+
+Deno.test("plan sin IA (tope 0) → 402", async () => {
+  const { d, pedidos } = deps({ estado: async () => ({ gastado: 0, tope: 0, foto: false, activo: true }) });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d);
+  assertEquals(r.status, 402); assertEquals(pedidos.length, 0);
 });
 
 Deno.test("costo de referencia: recetas con Sonnet rondan 3 centavos", () => {

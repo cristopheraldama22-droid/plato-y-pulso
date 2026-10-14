@@ -225,6 +225,23 @@ export function interpretar(tarea: Tarea, crudo: unknown): unknown {
   }
 }
 
+// Pensamiento del modelo: estas tareas son cortas y con formato fijo. Pensar gasta
+// tokens de salida (se cobran y cuentan dentro de max_tokens) y con topes de 300 o
+// 400 puede dejar la respuesta vacía. Haiku 5.5 lo apaga con "disabled"; Sonnet 5.5
+// no lo acepta y usa "between_tools" (sin herramientas, equivale a no pensar).
+export function thinkingPara(modelo: string): Record<string, string> | undefined {
+  if (modelo === "claude-haiku-5-5") return { type: "disabled" };
+  if (modelo === "claude-sonnet-5-5") return { type: "between_tools" };
+  return undefined;
+}
+
+// Lo máximo que puede costar un pedido (se reserva antes de llamar a Claude para
+// que varios pedidos simultáneos no pasen todos juntos el tope del plan).
+export function costoMaximo(p: Pedido, cfg: Config = CONFIG_BASE): number {
+  const entrada = p.contenido.reduce((a, c) => a + (c.type === "image" ? 2000 : Math.ceil(String(c.text ?? "").length / 3)), 0);
+  return costoUSD(p.modelo, entrada, p.maxTokens, cfg);
+}
+
 export function costoUSD(modelo: string, entrada: number, salida: number, cfg: Config = CONFIG_BASE): number {
   const p = cfg.precios[modelo] ?? cfg.precios[cfg.modeloRecetas] ?? [3, 15];
   return Math.round(((entrada * p[0] + salida * p[1]) / 1_000_000) * 1e6) / 1e6;

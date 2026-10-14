@@ -439,6 +439,7 @@ function renderEntrada(){
   let h="";
   if(ETAPA==="cargando")h=`<div class="loading"><div class="spinner"></div><p>Cargando…</p></div>`;
   else if(ETAPA==="sinconfig")h=`<section class="sec"><h1>Falta configurar la app</h1><p class="muted">Completá <b>config.js</b> con la dirección y la clave pública de Supabase, como indica la guía. Para probarla sin servidor, abrila con <b>?demo</b> al final de la dirección.</p></section>`;
+  else if(ETAPA==="sincarga")h=`<section class="sec"><h1>No se pudo cargar la app</h1><p class="muted">Revisá la conexión y volvé a abrirla. Tus datos están guardados en la nube.</p></section>`;
   else if(ETAPA==="login"){
     h=`<section class="sec hero"><p class="eyebrow">Comida, entreno y hábitos</p><h1>${esc(nombreApp())}</h1><p class="muted">Anotá lo que comés y entrenás, con estimaciones de calorías y proteínas y recetas con lo que tenés en casa.</p></section>
     <section class="card sec">${entrada.paso==="email"
@@ -1378,7 +1379,7 @@ async function boot(){
   const cfg=window.PP_CONFIG||{};
   const q=new URLSearchParams(location.search);
   if(!(cfg.supabaseUrl&&cfg.supabaseAnonKey)&&!cfg.demo&&!q.has("demo")){B={modo:"ninguno"};ETAPA="sinconfig";render();return}
-  B=PPBackend.crear(cfg);
+  try{B=PPBackend.crear(cfg)}catch(e){B={modo:"ninguno"};ETAPA="sincarga";render();return}
   B.alCambiarSesion(async ev=>{if(ev==="SIGNED_IN"&&ETAPA==="login"){SESION=await B.sesion();await alEntrar()}});
   try{SESION=await B.sesion()}catch(e){SESION=null}
   if(!SESION){ETAPA="login";render();return}
@@ -1390,6 +1391,6 @@ if("serviceWorker" in navigator&&location.protocol==="https:"){
     reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w)return;w.addEventListener("statechange",()=>{if(w.state==="installed"&&navigator.serviceWorker.controller)aviso("Hay una versión nueva: se aplica la próxima vez que abras la app.")})});
   }).catch(()=>{})});
 }
-if(new URLSearchParams(location.search).has("test"))window.__pp={S,ui,get ESP(){return ESP},get PERS(){return PERS},render};
+if(new URLSearchParams(location.search).has("test")&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname))window.__pp={S,ui,get ESP(){return ESP},get PERS(){return PERS},render};
 boot();
 })();
