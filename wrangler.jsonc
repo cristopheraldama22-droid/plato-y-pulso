@@ -1,0 +1,9 @@
+// Cloudflare Workers: publica solo la carpeta web/ como archivos estáticos.
+// El resto del repositorio (migraciones, pruebas, docs) nunca se sube al sitio.
+{
+  "name": "plato-y-pulso",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./web"
+  }
+}
