@@ -3,7 +3,7 @@
    seguridad la dan las reglas de la base de datos, no esta clave.
    Para probar sin servidor: demo: true (o abrir la app con ?demo). */
 window.PP_CONFIG = {
-  supabaseUrl: "",       // ej: "https://abcdxyz.supabase.co"
-  supabaseAnonKey: "",   // ej: "eyJhbGciOi..."
+  supabaseUrl: "https://ozciicrxridojhhdtxcq.supabase.co",
+  supabaseAnonKey: "sb_publishable_Aby-LM8baNH44ETh5-SdVw_yxeW6t6g",   // clave pública (publishable)
   demo: false
 };
