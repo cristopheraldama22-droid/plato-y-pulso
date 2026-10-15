@@ -42,7 +42,7 @@ jobs:
           rm -rf respaldo respaldo.tar.gz
 
       - name: Guardar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: respaldo-${{ github.run_number }}
           path: respaldo-*.tar.gz.gpg
