@@ -10,7 +10,7 @@
 class ErrorApp extends Error{constructor(codigo,mensaje){super(mensaje||codigo);this.codigo=codigo}}
 const MSG={
   sin_sesion:"Volvé a iniciar sesión.",codigo_invalido:"Ese código no existe. Revisalo con quien te invitó.",espacio_lleno:"Ese espacio llegó al máximo de personas de su plan.",muchos_intentos:"Demasiados códigos equivocados. Probá de nuevo en una hora.",
-  limite_espacios:"Llegaste al máximo de espacios que podés crear.",sin_permiso:"No tenés permiso para hacer eso.",ultimo_dueno:"El espacio tiene que tener al menos un dueño.",
+  limite_espacios:"Llegaste al máximo de espacios que podés crear.",sin_permiso:"No tenés permiso para hacer eso.",ultimo_dueno:"El espacio tiene que tener al menos un dueño.",transferir_primero:"Sos el único dueño de un espacio con otras personas. Pasale el rol de dueño a alguien antes de borrar tu cuenta.",
   tope_plan:"Se usó todo el cupo de IA del plan este mes.",plan_sin_foto:"Tu plan no incluye estimar desde fotos.",muchas_llamadas:"Muchas consultas seguidas. Esperá unos minutos.",
   ia_ocupada:"La IA está ocupada. Probá en un rato.",ia_no_disponible:"No se pudo contactar a la IA.",red:"Sin conexión. Se guarda cuando vuelva la señal."
 };
@@ -28,6 +28,9 @@ function nube(cfg){
     async enviarCodigo(email){const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});if(error)throw new ErrorApp("auth",/rate|seconds/i.test(error.message)?"Esperá un minuto antes de pedir otro código.":error.message)},
     async verificarCodigo(email,token){const {error}=await sb.auth.verifyOtp({email,token,type:"email"});if(error)throw new ErrorApp("auth","El código no es correcto o venció. Pedí uno nuevo.")},
     async salir(){await sb.auth.signOut()},
+    async privacidadAceptada(v){const {count,error}=await sb.from("consentimientos").select("version",{count:"exact",head:true}).eq("version",v);if(error)throw errDe(error);return count>0},
+    aceptarPrivacidad:(v)=>rpc("aceptar_privacidad",{p_version:v}),
+    async borrarCuenta(){await rpc("borrar_mi_cuenta");try{await sb.auth.signOut({scope:"local"})}catch(e){}},
     misEspacios:()=>rpc("mis_espacios"),
     crearEspacio:(nombre,tipo,miNombre)=>rpc("crear_espacio",{p_nombre:nombre,p_tipo:tipo,p_mi_nombre:miNombre}),
     async unirse(codigo,miNombre){const id=await rpc("unirse_con_codigo",{p_codigo:codigo,p_mi_nombre:miNombre});if(!id)throw new ErrorApp("codigo_invalido",MSG.codigo_invalido);return id},
@@ -85,6 +88,9 @@ function demo(){
     async enviarCodigo(){},
     async verificarCodigo(email){set("yo",{email,id:uid()})},
     async salir(){localStorage.removeItem(K+"yo")},
+    async privacidadAceptada(){return true},
+    async aceptarPrivacidad(){},
+    async borrarCuenta(){Object.keys(localStorage).filter(k=>k.startsWith(K)).forEach(k=>localStorage.removeItem(k))},
     async misEspacios(){const y=get("yo",null);return get("espacios",[]).filter(e=>e.miembros.some(m=>m.user_id===y.id)).map(e=>{const m=e.miembros.find(x=>x.user_id===y.id);return {espacio_id:e.id,nombre:e.nombre,tipo:e.tipo,datos_compartidos:e.datos_compartidos,marca:e.marca||{},plan_id:"demo",estado:"activo",miembro_id:m.id,rol:m.rol,mi_nombre:m.nombre}})},
     async crearEspacio(nombre,tipo,miNombre){const y=get("yo",null);const es=get("espacios",[]);const id=uid();es.push({id,nombre,tipo,datos_compartidos:tipo==="hogar",marca:{},codigo:Math.random().toString(16).slice(2,10).toUpperCase(),miembros:[{id:uid(),user_id:y.id,rol:"dueno",nombre:miNombre,activo:true}]});set("espacios",es);return id},
     async unirse(codigo,miNombre){const y=get("yo",null);const es=get("espacios",[]);const e=es.find(x=>x.codigo===String(codigo).trim().toUpperCase());if(!e)throw new ErrorApp("codigo_invalido",MSG.codigo_invalido);if(!e.miembros.some(m=>m.user_id===y.id))e.miembros.push({id:uid(),user_id:y.id,rol:"miembro",nombre:miNombre,activo:true});set("espacios",es);return e.id},

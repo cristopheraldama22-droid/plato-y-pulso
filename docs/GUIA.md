@@ -39,9 +39,10 @@ Tiempo estimado: 1 a 2 horas la primera vez. Todo se hace una sola vez; después
    ```html
    <h2>Tu código para entrar a Plato y Pulso</h2>
    <p style="font-size:28px;letter-spacing:4px"><b>{{ .Token }}</b></p>
-   <p>Vence en una hora. Si no lo pediste, ignorá este mail.</p>
+   <p>Vence en 10 minutos. Si no lo pediste, ignorá este mail.</p>
    ```
-   Asunto sugerido: `Tu código para entrar`.
+   Asunto sugerido: `Tu código para entrar`. Poné lo mismo en **Confirm signup** y tocá **Save changes** en cada una (recargá la página para confirmar que quedó guardado).
+   En **Sign In / Providers › Email**, poné **Email OTP Expiration** en `600` (10 minutos) y el largo del código en 6.
 6. **Authentication › URL Configuration**: en **Site URL** poné la dirección final de la app (ej. `https://app.tudominio.com`) y en **Redirect URLs** agregá `https://app.tudominio.com/` y `https://app.tudominio.com/**`.
 
 ### Mails de verdad (obligatorio)
@@ -118,6 +119,23 @@ En Supabase › **Table Editor**:
 - **Cambios en la app** (`web/`): subí la carpeta de nuevo en Cloudflare o, con GitHub, subí los cambios. Antes, cambiá el número de `VERSION` en `web/sw.js` para que los celulares tomen la versión nueva al abrir.
 - **Cambios en la base de datos:** nunca edites la migración ya aplicada. Creá un archivo nuevo en `supabase/migrations/` que solo **agregue** (columnas, tablas, políticas) y aplicalo con `npx supabase db push`. Antes, descargá un respaldo desde Supabase (**Database › Backups**, o `npx supabase db dump`).
 - **Cambios en la función de IA:** `npx supabase functions deploy ia`.
+
+## Respaldos
+
+El plan gratis de Supabase no hace copias diarias. El repositorio trae un respaldo semanal automático (`.github/workflows/respaldo.yml`), cifrado y guardado 90 días en GitHub.
+
+1. En GitHub › el repositorio › **Settings › Secrets and variables › Actions › New repository secret**, cargá:
+   - `SUPABASE_DB_URL`: en Supabase, botón **Connect** › **Session pooler** › copiá la URI y reemplazá `[YOUR-PASSWORD]` por la contraseña de la base.
+   - `RESPALDO_CLAVE`: una frase larga que inventes. **Guardala en tu gestor de contraseñas**: sin ella el respaldo no se puede abrir.
+2. **Actions › Respaldo › Run workflow** para probarlo. Tiene que terminar en verde y dejar un archivo en *Artifacts*.
+
+**Restaurar** (solo si se perdió la base): descargá el archivo, descifralo con `gpg -d respaldo-AAAA-MM-DD.tar.gz.gpg > r.tar.gz`, descomprimilo y aplicá en un proyecto nuevo `roles.sql`, `esquema.sql` y `datos.sql` en ese orden (con `psql`). Pedíselo a Claude Code si hace falta.
+
+## Privacidad (Ley 18.331)
+
+- La app pide consentimiento expreso la primera vez que alguien entra y lo registra en la tabla `consentimientos` con la versión aceptada. Si cambiás `web/privacidad.html` de forma importante, subí `PRIV_V` en `web/app.js` para que se vuelva a pedir.
+- Cada persona puede borrar su cuenta y sus datos desde **Ajustes › Eliminar mi cuenta y mis datos**.
+- Antes de vender a clientes: hacé revisar la política por un abogado e **inscribí la base de datos en la URCDP** (es obligatorio para bases con datos personales en Uruguay).
 
 ## Límites del plan gratis de Supabase (a tener en cuenta)
 

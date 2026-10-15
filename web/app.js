@@ -113,6 +113,8 @@ const EJ_COMIDAS={
    ========================================================= */
 const S={perfiles:{},meses:{},comp:{}};
 /* B: capa de datos (nube o demo) · ESP: espacio actual · YO: mi miembro · ETAPA: login | espacios | app */
+const PRIV_V="2026-10"; // versión de privacidad.html: si cambia, se vuelve a pedir el consentimiento
+let saliendo=false;
 let B=null,ESP=null,YO=null,ETAPA="cargando",SESION=null,ESPACIOS=[],MIEMBROS=[],IAEST=null;
 let AI="pendiente",FOTO=false;
 const GUEST=false;
@@ -450,6 +452,18 @@ function renderEntrada(){
         <label class="fld"><span>Código</span><input class="inp" id="lgC" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></label>
         <button class="btn pri wide" data-a="lgVerificar" ${entrada.ocupado?"disabled":""}>${entrada.ocupado?"Verificando…":"Entrar"}</button>
         <div class="row tight"><button class="link" data-a="lgOtro">Usar otro mail</button><button class="link" data-a="lgEnviar">Reenviar código</button></div>`}
+      ${entrada.error?`<p class="alert small">${esc(entrada.error)}</p>`:""}
+    </section>`;
+  }else if(ETAPA==="privacidad"){
+    h=`<section class="sec"><p class="eyebrow">${esc(SESION?SESION.email:"")}</p><h1>Antes de empezar</h1>
+      <p class="muted">${esc(nombreApp())} guarda datos de salud: lo que comés, tu peso y medidas, y tus entrenamientos. Por eso necesitamos tu consentimiento expreso.</p></section>
+    <section class="card sec">
+      <p class="small">Resumen: tus datos se usan solo para que la app funcione. Los ven las personas de tus espacios según cómo esté configurado cada uno (en un hogar, todos; en un grupo profesional, vos y quienes son profesionales). Para estimar comidas y armar recetas, el texto o la foto se envía a un servicio de IA. No vendemos tus datos. Podés borrar tu cuenta y todos tus datos cuando quieras desde Ajustes.</p>
+      <p class="small"><a href="privacidad.html" target="_blank" rel="noopener">Leer la política de privacidad completa</a></p>
+      <label class="chk"><input type="checkbox" id="pvA"> Leí y acepto la política de privacidad.</label>
+      <label class="chk"><input type="checkbox" id="pvB"> Doy mi consentimiento expreso para que se traten mis datos de salud con estos fines.</label>
+      <button class="btn pri wide" data-a="privAceptar" ${entrada.ocupado?"disabled":""}>${entrada.ocupado?"Guardando…":"Aceptar y seguir"}</button>
+      <button class="link" data-a="salir">No acepto, cerrar sesión</button>
       ${entrada.error?`<p class="alert small">${esc(entrada.error)}</p>`:""}
     </section>`;
   }else if(ETAPA==="espacios"){
@@ -1198,7 +1212,9 @@ async function hojaAjustes(){
    </section>
    <section class="sec"><h3>Cuenta</h3><p class="small muted">${esc(SESION?SESION.email:"")}</p>
     <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="salir">Cerrar sesión</button></div>
-    ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}</section>
+    ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}
+    <p class="small"><a href="privacidad.html" target="_blank" rel="noopener">Política de privacidad</a></p>
+    ${B.modo==="nube"?`<button class="btn warn" id="ajBorrarCuenta">Eliminar mi cuenta y mis datos</button><p class="hint">Borra tu usuario, tus datos y los espacios donde estás solo. No se puede deshacer: si querés, descargá antes un respaldo.</p>`:""}</section>
    <section class="sec"><h3>Sobre las estimaciones</h3>
     <p class="hint">Las calorías, proteínas y porciones de verdura las estima una IA (o una tabla base cuando no hay IA), siempre aproximadas. Cada plato estimado se recuerda para que el mismo plato dé siempre el mismo número, y tus correcciones a mano pisan ese valor. Nada de esto es consejo médico.</p>
    </section>`,pn=>{
@@ -1228,6 +1244,7 @@ async function hojaAjustes(){
     /* marca */
     const mk=q("#mkOk");if(mk)mk.addEventListener("click",async()=>{const m={nombre_app:q("#mkN").value.trim().slice(0,40),color:q("#mkC").value};const nom=q("#mkE").value.trim().slice(0,80)||ESP.nombre;
       try{await B.actualizarEspacio(ESP.espacio_id,{marca:m,nombre:nom});ESP.marca=m;ESP.nombre=nom;aplicarMarca();render();aviso("Marca guardada")}catch(e){aviso(e.message)}});
+    const bc=q("#ajBorrarCuenta");if(bc)borrarDoble(bc,async()=>{try{saliendo=true;await B.borrarCuenta();cerrar();await A.salir();aviso("Tu cuenta y tus datos fueron eliminados")}catch(e){saliendo=false;aviso(e.message)}},"¿Seguro? Se borra todo. Tocá de nuevo");
     const ir=q("#ajIrme");if(ir)borrarDoble(ir,async()=>{try{await B.quitarMiembro(YO);cerrar();await irAEspacios()}catch(e){aviso(e.message)}},"Tocá de nuevo para salir del espacio");
     /* respaldo */
     q("#aExp").addEventListener("click",()=>{const data=exportar();if(descargar(`${nombreApp().toLowerCase().replace(/[^a-z0-9]+/g,"-")}-respaldo-${hoyStr()}.json`,data))aviso("Respaldo descargado");else hojaTexto("Respaldo",data,"Copiá este texto y guardalo en un archivo .json.")});
@@ -1273,7 +1290,11 @@ const A={
     if(!n||!yo){entrada.error="Completá el nombre del espacio y el tuyo.";render();return}
     try{const id=await B.crearEspacio(n,t?t.dataset.v:"hogar",yo);await irAEspacios();const e=ESPACIOS.find(x=>x.espacio_id===id);if(e)await entrarEspacio(e)}catch(e){entrada.error=e.message;render()}},
   cambiarEsp:()=>{lsSet("pp:esp","");irAEspacios()},
-  salir:async()=>{try{await B.salir()}catch(e){}if(desuscribir){desuscribir();desuscribir=null}SESION=null;ESP=null;YO=null;ETAPA="login";entrada.paso="email";aplicarMarca();render()},
+  privAceptar:async()=>{
+    if(!$("#pvA").checked||!$("#pvB").checked){entrada.error="Para usar la app tenés que marcar las dos casillas.";render();return}
+    entrada.ocupado=true;entrada.error="";render();
+    try{await B.aceptarPrivacidad(PRIV_V);entrada.ocupado=false;await alEntrar()}catch(e){entrada.ocupado=false;entrada.error=e.message;render()}},
+  salir:async()=>{saliendo=true;try{await B.salir()}catch(e){}saliendo=false;if(desuscribir){desuscribir();desuscribir=null}SESION=null;ESP=null;YO=null;ETAPA="login";entrada.paso="email";aplicarMarca();render()},
   objetivo:d=>cambiarPerfil(ui.persona,x=>{x.objetivo=d.o}),
   perfil:()=>hojaPerfil(),
   anotarPeso:()=>hojaPeso(),
@@ -1369,6 +1390,10 @@ async function irAEspacios(sinError){
 let entrando=null;
 function alEntrar(){if(!entrando)entrando=alEntrar_().finally(()=>{entrando=null});return entrando}
 async function alEntrar_(){
+  if(B.modo==="nube"){
+    let ok=false;try{ok=await B.privacidadAceptada(PRIV_V)}catch(e){}
+    if(!ok){ETAPA="privacidad";entrada.error="";render();return}
+  }
   await irAEspacios();
   const cod=new URLSearchParams(location.search).get("codigo");
   const ult=lsGet("pp:esp");
@@ -1380,7 +1405,11 @@ async function boot(){
   const q=new URLSearchParams(location.search);
   if(!(cfg.supabaseUrl&&cfg.supabaseAnonKey)&&!cfg.demo&&!q.has("demo")){B={modo:"ninguno"};ETAPA="sinconfig";render();return}
   try{B=PPBackend.crear(cfg)}catch(e){B={modo:"ninguno"};ETAPA="sincarga";render();return}
-  B.alCambiarSesion(async ev=>{if(ev==="SIGNED_IN"&&ETAPA==="login"){SESION=await B.sesion();await alEntrar()}});
+  B.alCambiarSesion(async ev=>{
+    if(ev==="SIGNED_IN"&&ETAPA==="login"){SESION=await B.sesion();await alEntrar()}
+    if(ev==="SIGNED_OUT"&&!saliendo&&SESION){await A.salir();entrada.error="Tu sesión se cerró. Entrá de nuevo con tu mail.";render()}
+  });
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SESION&&B.modo==="nube")B.sesion().catch(()=>{})});
   try{SESION=await B.sesion()}catch(e){SESION=null}
   if(!SESION){ETAPA="login";render();return}
   await alEntrar();

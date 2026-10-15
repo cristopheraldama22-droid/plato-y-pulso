@@ -1,0 +1,50 @@
+# Respaldo semanal de la base de datos (Supabase gratis no hace copias diarias).
+# Guarda un archivo cifrado en GitHub (Actions › Respaldo › Artifacts) por 90 días.
+# Necesita dos secretos del repositorio (Settings › Secrets and variables › Actions):
+#   SUPABASE_DB_URL  cadena de conexión "Session pooler" de Supabase (botón Connect), con la contraseña
+#   RESPALDO_CLAVE   frase larga para cifrar el respaldo; guardala aparte: sin ella no se puede abrir
+# Para restaurar, ver docs/GUIA.md › Respaldos.
+name: Respaldo
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # lunes 03:00 de Uruguay
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Volcar la base
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DB_URL" || { echo "Falta el secreto SUPABASE_DB_URL"; exit 1; }
+          mkdir respaldo && cd respaldo
+          npx -y supabase@2 db dump --db-url "$DB_URL" --role-only -f roles.sql
+          npx -y supabase@2 db dump --db-url "$DB_URL" -f esquema.sql
+          npx -y supabase@2 db dump --db-url "$DB_URL" --data-only --use-copy --schema public,auth -f datos.sql
+          ls -la
+
+      - name: Cifrar
+        env:
+          CLAVE: ${{ secrets.RESPALDO_CLAVE }}
+        run: |
+          set -euo pipefail
+          test -n "$CLAVE" || { echo "Falta el secreto RESPALDO_CLAVE"; exit 1; }
+          tar czf respaldo.tar.gz respaldo
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$CLAVE" --symmetric --cipher-algo AES256 -o "respaldo-$(date -u +%F).tar.gz.gpg" respaldo.tar.gz
+          rm -rf respaldo respaldo.tar.gz
+
+      - name: Guardar
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-${{ github.run_number }}
+          path: respaldo-*.tar.gz.gpg
+          retention-days: 90
+          if-no-files-found: error

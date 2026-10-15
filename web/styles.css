@@ -262,3 +262,5 @@ p.alert{color:var(--warn);font-weight:600}
 .selwho{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;grid-column:1/-1;padding:0 6px}
 .who:has(.selwho){display:block;background:transparent;padding:0}
 .selwho select{min-height:44px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:15px;line-height:1.4;cursor:pointer}
+.chk input{width:20px;height:20px;margin-top:1px;flex:none;accent-color:var(--accent)}
