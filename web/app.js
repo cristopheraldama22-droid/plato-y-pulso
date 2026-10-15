@@ -247,7 +247,7 @@ async function llamarIA(tarea,datos,signal){
     if(IAEST&&isNum(r.gastado)){IAEST.gastado=+r.gastado}
     return r.resultado;
   }catch(e){
-    if(e&&["tope_plan","espacio_suspendido","sin_permiso"].includes(e.codigo)){AI="off";FOTO=false;render()}
+    if(e&&["tope_plan","plan_vencido","espacio_suspendido","sin_permiso"].includes(e.codigo)){AI="off";FOTO=false;render()}
     if(e&&e.codigo==="plan_sin_foto"){FOTO=false;render()}
     throw e;
   }
@@ -1228,7 +1228,9 @@ async function hojaAjustes(){
         const N={estimar:"Estimaciones",estimar_lote:"Mejoras en lote",foto:"Fotos",recetas:"Recetas",compra:"Listas de compra"};
         det=Object.keys(por).length?`<div class="small">${Object.entries(por).map(([k,v])=>`${N[k]||k}: ${v.n} · US$ ${v.c.toFixed(3)}`).join("<br>")}</div>`:`<span class="small muted">Todavía no se usó IA este mes.</span>`}
       if(!box.isConnected)return;
-      box.innerHTML=st?`<div class="legend"><b>IA de este mes · plan ${esc(st.plan)}</b><span class="small muted">${st.tope>0?`${Math.min(100,Math.round(st.gastado/st.tope*100))}% del cupo`:"sin IA"}</span></div>${st.tope>0?`<div class="meter" style="color:var(--accent)"><i style="width:${Math.min(100,st.gastado/st.tope*100)}%"></i></div>`:""}${dueno&&st.tope>0?`<span class="small muted">US$ ${st.gastado.toFixed(3)} de US$ ${st.tope.toFixed(2)}${st.foto?"":" · el plan no incluye fotos"}</span>`:""}${det}`:`<span class="small muted">Sin datos de IA.</span>`;
+      const dias=st&&st.vence?Math.round((new Date(st.vence+"T23:59:59")-new Date())/864e5):null;
+      const venc=dias===null?"":dias>=0?`<p class="small"><b>${dias===0?"Último día":`Quedan ${dias} día${dias===1?"":"s"}`} con IA.</b> Después la app sigue funcionando sin IA.</p>`:`<p class="small"><b>Terminó el período con IA.</b> La app sigue funcionando; las estimaciones salen de la tabla.</p>`;
+      box.innerHTML=st?`${venc}<div class="legend"><b>IA de este mes · plan ${esc(st.plan)}</b><span class="small muted">${st.tope>0?`${Math.min(100,Math.round(st.gastado/st.tope*100))}% del cupo`:"sin IA"}</span></div>${st.tope>0?`<div class="meter" style="color:var(--accent)"><i style="width:${Math.min(100,st.gastado/st.tope*100)}%"></i></div>`:""}${dueno&&st.tope>0?`<span class="small muted">US$ ${st.gastado.toFixed(3)} de US$ ${st.tope.toFixed(2)}${st.foto?"":" · el plan no incluye fotos"}</span>`:""}${det}`:`<span class="small muted">Sin datos de IA.</span>`;
     }catch(e){if(box.isConnected)box.innerHTML=`<span class="small muted">No pude leer el consumo de IA.</span>`}})();
     /* código de invitación */
     if(prof&&ESP.tipo!=="personal")(async()=>{const box=q("#ajCod");try{const c=await B.codigo(ESP.espacio_id);const link=location.origin+location.pathname+"?codigo="+encodeURIComponent(c||"");
@@ -1364,6 +1366,8 @@ async function cargarMiembros(){
   const veoTodos=COMPARTE()||["dueno","profesional"].includes(ESP.rol);
   PERS=[YO,...MIEMBROS.map(m=>m.id).filter(id=>id!==YO&&veoTodos)];
 }
+let diaMarcado="";
+function marcarHoy(){const d=hoyStr();if(B&&B.modo==="nube"&&SESION&&diaMarcado!==d){diaMarcado=d;B.marcarActividad()}}
 async function entrarEspacio(e){
   if(desuscribir){desuscribir();desuscribir=null}
   ESP=e;YO=e.miembro_id;lsSet("pp:esp",e.espacio_id);
@@ -1376,7 +1380,8 @@ async function entrarEspacio(e){
     docs.forEach(d=>{const path=deNube(d.coleccion,d.doc_id,d.data);if(path)ponerDoc(path,d.data)});
     Object.entries(lsGet(clavePend())||{}).forEach(([k,v])=>{pendientes.set(k,v);ponerDoc(k,v)});
     IAEST=await B.estadoIA(e.espacio_id).catch(()=>null);
-    AI=IAEST&&IAEST.activo&&IAEST.tope>0&&IAEST.gastado<IAEST.tope?"ok":"off";
+    AI=IAEST&&IAEST.activo&&IAEST.iaActiva!==false&&IAEST.tope>0&&IAEST.gastado<IAEST.tope?"ok":"off";
+    marcarHoy();
     FOTO=AI==="ok"&&!!(IAEST&&IAEST.foto);
     suscribir();
     const prev=lsGet("pp:persona");ui.persona=PERS.includes(prev)?prev:YO;
@@ -1414,7 +1419,7 @@ async function boot(){
     if(ev==="SIGNED_IN"&&ETAPA==="login"){SESION=await B.sesion();await alEntrar()}
     if(ev==="SIGNED_OUT"&&!saliendo&&SESION){await A.salir();entrada.error="Tu sesión se cerró. Entrá de nuevo con tu mail.";render()}
   });
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SESION&&B.modo==="nube")B.sesion().catch(()=>{})});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SESION&&B.modo==="nube"){B.sesion().catch(()=>{});if(ESP)marcarHoy()}});
   try{SESION=await B.sesion()}catch(e){SESION=null}
   if(!SESION){ETAPA="login";render();return}
   await alEntrar();

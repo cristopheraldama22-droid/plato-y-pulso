@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es-UY">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel de uso · Plato y Pulso</title>
+<style>
+  :root{--bg:#F6F7F2;--card:#FFFFFF;--fg:#1D2420;--muted:#5A675D;--line:#D3DACB;--accent:#2D6A3A;--accent2:#C7832F}
+  @media (prefers-color-scheme:dark){:root{--bg:#141A16;--card:#1B231E;--fg:#E8EDE6;--muted:#98A69B;--line:#2D3930;--accent:#7BC48A;--accent2:#E0A55A}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  h1{font-size:24px;margin:0}
+  h2{font-size:16px;margin:0 0 12px}
+  .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .muted{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+  @media (min-width:720px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px;margin-bottom:12px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:8px}
+  .bars div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;position:relative}
+  .bars div:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-size:12px;padding:2px 6px;border-radius:4px;white-space:nowrap}
+  .eje{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;padding:8px 6px;border-top:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{overflow-x:auto}
+  .fila{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)}
+  .fila:first-of-type{border-top:0}
+  .aviso{padding:24px;text-align:center}
+  a{color:var(--accent)}
+  button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div><h1>Panel de uso</h1><span class="muted" id="gen">Cargando…</span></div>
+    <div><button id="recargar" type="button">Actualizar</button> <a href="./">Ir a la app</a></div>
+  </div>
+  <div id="contenido"></div>
+</main>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

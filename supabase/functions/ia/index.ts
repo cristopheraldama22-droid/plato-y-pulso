@@ -55,7 +55,7 @@ Deno.serve((req) => manejar(req, {
     // deno-lint-ignore no-explicit-any
     const plan = (s as any).planes ?? {};
     const vencido = !!s.plan_vence && s.plan_vence < new Date().toISOString().slice(0, 10);
-    return { gastado, tope: Number(plan.ia_tope_usd ?? 0), foto: !!plan.ia_foto, activo: s.estado === "activo" && !vencido };
+    return { gastado, tope: Number(plan.ia_tope_usd ?? 0), foto: !!plan.ia_foto, activo: s.estado === "activo", vencido };
   },
   async llamadasRecientes(user, segundos) {
     const desde = new Date(Date.now() - segundos * 1000).toISOString();

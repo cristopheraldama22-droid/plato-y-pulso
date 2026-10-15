@@ -165,6 +165,12 @@ Deno.test("si no se puede reservar el uso: no llama a la IA", async () => {
   assertEquals(r.status, 500); assertEquals(pedidos.length, 0);
 });
 
+Deno.test("prueba vencida → 402 plan_vencido, sin llamar a la IA", async () => {
+  const { d, pedidos } = deps({ estado: async () => ({ gastado: 0, tope: 0.5, foto: true, activo: true, vencido: true }) });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d);
+  assertEquals(r.status, 402); assertEquals((await r.json()).error, "plan_vencido"); assertEquals(pedidos.length, 0);
+});
+
 Deno.test("plan sin IA (tope 0) → 402", async () => {
   const { d, pedidos } = deps({ estado: async () => ({ gastado: 0, tope: 0, foto: false, activo: true }) });
   const r = await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d);

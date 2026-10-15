@@ -8,7 +8,7 @@ export interface Deps {
   usuario(jwt: string): Promise<string | null>;
   miembro(espacio: string, user: string): Promise<{ rol: string } | null>;
   // Si la base falla, estas lecturas tiran error: ante la duda no se llama a la IA.
-  estado(espacio: string): Promise<{ gastado: number; tope: number; foto: boolean; activo: boolean } | null>;
+  estado(espacio: string): Promise<{ gastado: number; tope: number; foto: boolean; activo: boolean; vencido?: boolean } | null>;
   llamadasRecientes(user: string, segundos: number): Promise<number>;
   // Antes de llamar a Claude se reserva una fila con el costo máximo; al terminar se cierra con el costo real.
   reservar(fila: FilaUso): Promise<string | number>;
@@ -60,6 +60,7 @@ async function atender(req: Request, deps: Deps, responder: (status: number, cue
   if (!m) return responder(403, { error: "sin_permiso" });
   const est = await deps.estado(espacio);
   if (!est || !est.activo) return responder(403, { error: "espacio_suspendido", mensaje: "El espacio está suspendido." });
+  if (est.vencido) return responder(402, { error: "plan_vencido", mensaje: "Terminó tu período con IA. La app sigue funcionando: las estimaciones salen de la tabla." });
   if (tarea === "foto" && !est.foto) return responder(403, { error: "plan_sin_foto", mensaje: "Tu plan no incluye estimar desde fotos." });
   if (est.gastado >= est.tope) return responder(402, { error: "tope_plan", mensaje: est.tope > 0 ? "Se usó todo el cupo de IA del plan este mes." : "Tu plan no incluye IA.", gastado: est.gastado, tope: est.tope });
   const recientes = await deps.llamadasRecientes(user, 300);
