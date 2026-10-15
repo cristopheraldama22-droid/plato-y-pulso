@@ -20,10 +20,10 @@ La base técnica ya está preparada para los tres: espacios con dueño, profesio
 |---|---|---|
 | Estimar una comida escrita | Haiku | US$ 0,0001 |
 | Estimar desde una foto | Haiku | US$ 0,0003 |
-| Generar 5 recetas | Sonnet | US$ 0,03 |
+| Generar 5 recetas | Haiku | US$ 0,0015 |
 | Armar la compra de la semana | Haiku | US$ 0,001 |
 
-**Uso típico por persona activa al mes** (unas 150 comidas, 30 fotos, 8 tandas de recetas y 4 compras): **unos US$ 0,25**. Casi todo el costo son las recetas; si se pasan a Haiku, baja a menos de US$ 0,05.
+**Uso típico por persona activa al mes** (unas 150 comidas, 30 fotos, 8 tandas de recetas y 4 compras): **unos US$ 0,04**. Todas las tareas usan Haiku 5.5, el modelo más barato. Si se pasaran las recetas a Sonnet (más calidad), subiría a unos US$ 0,27.
 
 **Infraestructura**
 

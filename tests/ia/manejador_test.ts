@@ -1,7 +1,7 @@
 // deno test tests/ia
 import { assert, assertEquals, assertMatch } from "./afirmar.ts";
 import { manejar, Deps } from "../../supabase/functions/ia/manejador.ts";
-import { armarPedido, costoUSD, extraerJSON } from "../../supabase/functions/ia/logica.ts";
+import { armarPedido, CONFIG_BASE, costoUSD, extraerJSON } from "../../supabase/functions/ia/logica.ts";
 
 const ESP = "0b7e6f2a-1c2d-4e5f-8a9b-0c1d2e3f4a5b";
 
@@ -106,7 +106,7 @@ Deno.test("recetas: usa el modelo de recetas, limpia y devuelve 5", async () => 
   assertEquals(j.resultado[0].veg, 1.5);
   assertEquals(j.resultado[0].ingredientes[1], { item: "Sal", cant: "" });
   const p = pedidos[0] as { model: string; messages: { content: { text: string }[] }[] };
-  assertEquals(p.model, "claude-sonnet-5-5");
+  assertEquals(p.model, "claude-haiku-5-5");
   const txt = p.messages[0].content[0].text;
   assertMatch(txt, /para 2 personas/); assertMatch(txt, /ganar músculo/); assertMatch(txt, /Rápidas/); assertMatch(txt, /Tortilla/);
 });
@@ -143,11 +143,11 @@ Deno.test("reserva el costo máximo antes de llamar a Claude y después lo ajust
   assertEquals(registros[0].tokens_salida, 80);
 });
 
-Deno.test("pensamiento apagado: Haiku con disabled, Sonnet con between_tools", async () => {
+Deno.test("pensamiento apagado en todas las tareas; Sonnet usa between_tools si se configura", async () => {
   const { d, pedidos } = deps();
   await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "milanesa" } }), d);
   assertEquals((pedidos[0] as { thinking: unknown }).thinking, { type: "disabled" });
-  const { d: d2, pedidos: p2 } = deps({ respuesta: "[]" });
+  const { d: d2, pedidos: p2 } = deps({ respuesta: "[]", config: { ...CONFIG_BASE, modeloRecetas: "claude-sonnet-5-5" } });
   await manejar(pedir({ espacio_id: ESP, tarea: "recetas", datos: {} }), d2);
   assertEquals((p2[0] as { thinking: unknown }).thinking, { type: "between_tools" });
 });
@@ -171,7 +171,7 @@ Deno.test("plan sin IA (tope 0) → 402", async () => {
   assertEquals(r.status, 402); assertEquals(pedidos.length, 0);
 });
 
-Deno.test("costo de referencia: recetas con Sonnet rondan 3 centavos", () => {
-  const c = costoUSD("claude-sonnet-5-5", 1500, 2500);
-  assert(c > 0.02 && c < 0.04, String(c));
+Deno.test("costo de referencia: recetas con Haiku cuestan menos de medio centavo", () => {
+  const c = costoUSD("claude-haiku-5-5", 1500, 2500);
+  assert(c < 0.005, String(c));
 });

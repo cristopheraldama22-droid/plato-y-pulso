@@ -80,7 +80,7 @@ npx supabase functions deploy ia --no-verify-jwt
 - `--no-verify-jwt` hace falta con las claves nuevas de Supabase (`sb_publishable_...`). Es seguro: la función valida la sesión de cada pedido por su cuenta.
 - `ORIGENES_PERMITIDOS` hace que la función solo responda a tu app (exacto, sin barra final). Si lo dejás vacío, responde a cualquier página, aunque igual exige una sesión válida.
 - No cargues secretos que empiecen con `SUPABASE_`: esos los pone Supabase.
-- Opcionales: `MODELO_RAPIDO` (por defecto `claude-haiku-5-5`), `MODELO_RECETAS` (por defecto `claude-sonnet-5-5`) y `MAX_LLAMADAS_5MIN` (por defecto 40 por persona).
+- Opcionales: `MODELO_RAPIDO` (por defecto `claude-haiku-5-5`), `MODELO_RECETAS` (por defecto `claude-haiku-5-5`, el más barato; se puede subir a `claude-sonnet-5-5` si las recetas no convencen, a unas 20 veces el costo) y `MAX_LLAMADAS_5MIN` (por defecto 40 por persona).
 
 ## 4. La app en tu dominio (Cloudflare Pages)
 

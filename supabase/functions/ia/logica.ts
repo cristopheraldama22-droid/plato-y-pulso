@@ -7,13 +7,13 @@ export const TAREAS: Tarea[] = ["estimar", "estimar_lote", "foto", "recetas", "c
 
 export interface Config {
   modeloRapido: string;   // estimaciones, fotos, lista de compras
-  modeloRecetas: string;  // recetas (más calidad)
+  modeloRecetas: string;  // recetas
   precios: Record<string, [number, number]>; // USD por millón de tokens [entrada, salida]
 }
 
 export const CONFIG_BASE: Config = {
   modeloRapido: "claude-haiku-5-5",
-  modeloRecetas: "claude-sonnet-5-5",
+  modeloRecetas: "claude-haiku-5-5",   // el más barato; con MODELO_RECETAS se puede subir a claude-sonnet-5-5
   // Precios públicos de Anthropic (octubre 2026). Se pueden cambiar con la variable PRECIOS_JSON.
   precios: {
     "claude-haiku-5-5": [0.10, 0.50],
