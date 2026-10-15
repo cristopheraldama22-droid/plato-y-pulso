@@ -398,11 +398,12 @@ const ICON={
  hoy:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
  comidas:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/>',
  entrenos:'<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
- rutinas:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+ semana:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3"/>',
+ rutinas:'<path d="M4 12a8 8 0 0113.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.6L4 15.5M4 20v-4.5h4.5"/>',
  cocina:'<path d="M4.5 10.5h15v5.5a4 4 0 01-4 4h-7a4 4 0 01-4-4zM2.5 10.5h19M9.5 7c0-1 1-1.5 1-2.6M14 7c0-1 1-1.5 1-2.6"/>',
  resumen:'<path d="M5 20v-7M12 20V5M19 20v-10M3 20.5h18"/>'
 };
-const TABS=[["hoy","Hoy"],["comidas","Comidas"],["entrenos","Entrenos"],["rutinas","Rutinas"],["cocina","Cocina"],["resumen","Resumen"]];
+const TABS=[["hoy","Hoy"],["comidas","Comidas"],["semana","Semana"],["entrenos","Entrenos"],["rutinas","Rutinas"],["cocina","Cocina"],["resumen","Resumen"]];
 const PERSONALES=["hoy","comidas","entrenos","rutinas","resumen"];
 
 function nombreApp(){return (ESP&&ESP.marca&&ESP.marca.nombre_app)||"Plato y Pulso"}
@@ -539,6 +540,105 @@ function spark(vals){
    Vistas
    ========================================================= */
 const VISTAS={};
+/* ---------- Menú semanal: un documento de cocina ("menu") con las semanas por lunes ----------
+   semanas[AAAA-MM-DD del lunes][dia][slot] = {id,tipo:"receta"|"plato"|"texto",titulo,kcal,prot,veg,ingredientes,pasos,hecho}
+   Las recetas se copian al menú para que no se pierdan al generar recetas nuevas. Se guardan 4 semanas de historia. */
+const MENU_SLOTS=[["desayuno","Desayuno"],["almuerzo","Almuerzo"],["merienda","Merienda"],["cena","Cena"]];
+const semanaMenu=lun=>((S.comp.menu&&S.comp.menu.semanas)||{})[lun]||{};
+const itemMenu=(lun,dia,slot)=>((semanaMenu(lun)[dia]||{})[slot])||null;
+const fechaDe=(lun,dia)=>addDays(lun,DIAS.indexOf(dia));
+function cambiarMenu(lun,fn){
+  cambiarComp("menu",d=>{d.semanas=d.semanas||{};const sem=d.semanas[lun]=d.semanas[lun]||{};fn(sem);
+    Object.keys(sem).forEach(k=>{if(!sem[k]||!Object.keys(sem[k]).length)delete sem[k]});
+    if(!Object.keys(sem).length)delete d.semanas[lun];
+    const limite=addDays(lunesDe(hoyStr()),-28);Object.keys(d.semanas).forEach(k=>{if(k<limite)delete d.semanas[k]});
+  });
+}
+const itemDeReceta=r=>({id:uid(),tipo:"receta",titulo:String(r.titulo||"").slice(0,120),kcal:+r.kcal||0,prot:+r.prot||0,veg:+r.veg||0,tiempo_min:+r.tiempo_min||0,ingredientes:(r.ingredientes||[]).slice(0,25),pasos:(r.pasos||[]).slice(0,12)});
+const itemDePlato=x=>({id:uid(),tipo:"plato",titulo:String(x.nombre||"").slice(0,120),kcal:+x.kcal||0,prot:+x.prot||0,veg:+x.veg||0});
+const nombreSemana=lun=>{const l0=lunesDe(hoyStr());return lun===l0?"Esta semana":lun===addDays(l0,7)?"La próxima semana":lun===addDays(l0,-7)?"La semana pasada":"Semana del "+fechaCorta(lun)};
+function ponerEnMenu(lun,dia,slot,item){cambiarMenu(lun,sem=>{sem[dia]=sem[dia]||{};sem[dia][slot]=item})}
+function marcarComido(lun,dia,slot){cambiarMenu(lun,sem=>{const it=(sem[dia]||{})[slot];if(it)it.hecho=true})}
+function comerDelMenu(lun,dia,slot){
+  const it=itemMenu(lun,dia,slot);if(!it)return;const fin=()=>marcarComido(lun,dia,slot);
+  if(it.tipo==="texto")hojaComida({f:hoyStr(),slot,pre:{texto:it.titulo},alGuardar:fin});
+  else hojaCocinamos(it,{slot,alGuardar:fin});
+}
+function bloqueMenuHoy(lun,dk,slots){
+  return `<section class="sec"><div class="sec-h"><h2>Hoy en el menú</h2><button class="link" data-a="tab" data-t="semana">Ver semana</button></div><div class="card">${slots.map(([k,l])=>{const it=itemMenu(lun,dk,k);
+    return `<div class="plan"><div class="pt"><small>${l}</small>${esc(it.titulo)}</div><div class="row tight">${it.tipo==="receta"?`<button class="btn sm" data-a="menuVer" data-l="${lun}" data-d="${dk}" data-s="${k}">Receta</button>`:""}<button class="btn sm pri" data-a="menuComer" data-l="${lun}" data-d="${dk}" data-s="${k}">La comimos</button></div></div>`}).join("")}</div></section>`;
+}
+function hojaMenu(lun,dia,slot){
+  const it=itemMenu(lun,dia,slot),favs=favoritas(),act=recetasDoc().actuales||[],pls=platos();
+  const chips=(lista,src,txt)=>lista.length?`<div class="fld"><span>${txt}</span><div class="chips">${lista.map((x,i)=>`<button type="button" class="chip" data-src="${src}" data-i="${i}">${esc(x.titulo||x.nombre)}</button>`).join("")}</div></div>`:"";
+  abrir(`<h2>${SLOT_N[slot]} del ${DIAS_L[dia].toLowerCase()}</h2><p class="small muted">${nombreSemana(lun)} · ${fechaCorta(fechaDe(lun,dia))}</p>
+   <label class="fld"><span>¿Qué van a comer?</span><input class="inp" id="mnT" maxlength="120" value="${esc(it&&it.tipo==="texto"?it.titulo:"")}" placeholder="Ej: milanesas con puré"></label>
+   <button class="btn pri wide" id="mnOk">Guardar</button>
+   ${chips(favs,"fav","O elegí una receta favorita")}${chips(act,"act","Recetas generadas")}${chips(pls,"pl","Platos guardados")}
+   ${!favs.length&&!act.length&&!pls.length?`<p class="hint">En Cocina › Recetas podés generar recetas y guardar favoritas para elegirlas acá con un toque. Con receta, la compra se arma sola.</p>`:""}
+   ${it?`<button class="btn warn wide" id="mnX">Quitar del menú</button>`:""}`,pn=>{
+    const q=x=>pn.querySelector(x),t=q("#mnT");
+    const listo=item=>{ponerEnMenu(lun,dia,slot,item);cerrar();aviso(`${SLOT_N[slot]} del ${DIAS_L[dia].toLowerCase()}: ${item.titulo}`)};
+    q("#mnOk").addEventListener("click",()=>{const v=t.value.trim();if(!v){aviso("Escribí qué van a comer o elegí una receta.");t.focus();return}
+      listo({id:uid(),tipo:"texto",titulo:v.slice(0,120)})});
+    t.addEventListener("keydown",e=>{if(e.key==="Enter")q("#mnOk").click()});
+    pn.querySelectorAll(".chip[data-src]").forEach(b=>b.addEventListener("click",()=>{const i=+b.dataset.i;
+      if(b.dataset.src==="pl")listo(itemDePlato(pls[i]));else listo(itemDeReceta(b.dataset.src==="fav"?favs[i]:act[i]))}));
+    const x=q("#mnX");if(x)x.addEventListener("click",()=>{cambiarMenu(lun,sem=>{if(sem[dia])delete sem[dia][slot]});cerrar();aviso("Quitado del menú")});
+  });
+}
+function hojaRecMenu(r){
+  const l0=lunesDe(hoyStr()),man=addDays(hoyStr(),1),l1=addDays(l0,7);
+  abrir(`<h2>Al menú</h2><p class="small muted">${esc(r.titulo)}</p>
+   <div class="fld"><span>Semana</span>${opciones("sem",[[l0,"Esta"],[l1,"La próxima"]],man<l1?l0:l1)}</div>
+   <div class="fld"><span>Día</span>${opciones("dia",DIAS.map(k=>[k,DIAS_L[k].slice(0,3)]),diaKey(man))}</div>
+   <div class="fld"><span>Comida</span>${opciones("slot",MENU_SLOTS,"cena")}</div>
+   <button class="btn pri wide" id="rmOk">Agregar</button>`,pn=>{
+    pn.querySelector("#rmOk").addEventListener("click",()=>{const lun=valGrupo(pn,"sem"),dia=valGrupo(pn,"dia"),sl=valGrupo(pn,"slot");
+      const ya=itemMenu(lun,dia,sl);ponerEnMenu(lun,dia,sl,itemDeReceta(r));cerrar();
+      aviso(`${ya?"Reemplazada":"Agregada"}: ${SLOT_N[sl].toLowerCase()} del ${DIAS_L[dia].toLowerCase()}`)});
+  });
+}
+function hojaRecetaMenu(it){
+  abrir(`<h2>${esc(it.titulo)}</h2>
+   <p class="small muted">${it.tiempo_min?`${it.tiempo_min} min · `:""}~${fmtN(it.kcal)} kcal · ~${fmtN(it.prot)} g de proteína por porción</p>
+   ${(it.ingredientes||[]).length?`<div class="fld"><span>Ingredientes</span><ul class="small">${it.ingredientes.map(i=>`<li>${esc(i.item)}${i.cant?` <span class="muted">(${esc(i.cant)})</span>`:""}</li>`).join("")}</ul></div>`:""}
+   ${(it.pasos||[]).length?`<div class="fld"><span>Pasos</span><ol class="small">${it.pasos.map(p=>`<li>${esc(p)}</li>`).join("")}</ol></div>`:""}`);
+}
+function compraDelMenu(lun){
+  const sem=semanaMenu(lun),hoy=hoyStr(),dsp=despensa().map(d=>norm(d.nombre)).filter(Boolean);
+  const hay=n=>dsp.some(d=>n.includes(d)||d.split(" ").some(w=>w.length>3&&n.includes(w)));
+  const items=[],vistos=new Set();let sinReceta=0;
+  DIAS.forEach(dia=>{if(fechaDe(lun,dia)<hoy)return;MENU_SLOTS.forEach(([k])=>{const it=(sem[dia]||{})[k];if(!it||it.hecho)return;
+    if(!(it.ingredientes||[]).length){sinReceta++;return}
+    it.ingredientes.forEach(i=>{const n=norm(i.item);if(!n||vistos.has(n)||hay(n))return;vistos.add(n);items.push({nombre:i.item,cant:i.cant})})})});
+  const n=items.length?agregarACompras(items,"menú "+fechaCorta(lun)):0;
+  aviso((n?`${n} ${n===1?"ingrediente sumado":"ingredientes sumados"} a la compra`:items.length?"Ya estaba todo en la lista":"No hay ingredientes nuevos para comprar")+(sinReceta?` · ${sinReceta} ${sinReceta===1?"comida no tiene":"comidas no tienen"} receta`:""));
+}
+VISTAS.semana=function(){
+  const hoy=hoyStr(),lun=ui.semana||lunesDe(hoy),sem=semanaMenu(lun);
+  const slots=MENU_SLOTS.filter(([k])=>ui.menuTodo||k==="almuerzo"||k==="cena"||DIAS.some(d=>(sem[d]||{})[k]));
+  const n=DIAS.reduce((a,d)=>a+Object.keys(sem[d]||{}).length,0);
+  const btn=(a,lun,dia,k,txt,cls,lab)=>`<button class="btn sm${cls?" "+cls:""}" data-a="${a}" data-l="${lun}" data-d="${dia}" data-s="${k}"${lab?` aria-label="${lab}"`:""}>${txt}</button>`;
+  return `<section class="sec">
+    <p class="eyebrow">${COMPARTE()&&PERS.length>1?"Menú de la casa":"Tu menú"}</p>
+    <div class="datenav"><button class="arrow" data-a="semNav" data-d="-7" aria-label="Semana anterior">‹</button>
+      <div class="dl"><b>${nombreSemana(lun)}</b><span class="small muted">${fechaCorta(lun)} al ${fechaCorta(addDays(lun,6))}</span></div>
+      <button class="arrow" data-a="semNav" data-d="7" aria-label="Semana siguiente">›</button></div>
+    <div class="row">${n?`<button class="btn pri" data-a="semCompra">Armar la compra</button>`:""}<button class="btn" data-a="semTodo">${ui.menuTodo?"Solo almuerzo y cena":"+ Desayuno y merienda"}</button></div>
+    <p class="hint">${n?`${n} ${n===1?"comida planificada":"comidas planificadas"}. "Armar la compra" suma los ingredientes de las recetas que no están en la despensa.`:"Planificá qué van a comer cada día. Con recetas, la lista de compras se arma sola."}</p>
+  </section>
+  ${DIAS.map(dia=>{const f=fechaDe(lun,dia),esHoy=f===hoy,pasado=f<hoy,dd=sem[dia]||{};
+    const llenos=slots.filter(([k])=>dd[k]),vacios=slots.filter(([k])=>!dd[k]);
+    return `<section class="card sec menu-dia${esHoy?" hoy":""}${pasado?" pasado":""}">
+      <div class="sec-h"><h3>${DIAS_L[dia]} <span class="small muted">${fechaCorta(f)}</span></h3>${esHoy?`<span class="pill">Hoy</span>`:""}</div>
+      ${llenos.map(([k,l])=>{const it=dd[k];return `<div class="plan"><div class="pt"><small>${l}${it.kcal?` · ~${fmtN(it.kcal)} kcal`:""}${it.hecho?" · anotada":""}</small>${esc(it.titulo)}</div>
+        <div class="row tight">${it.tipo==="receta"?btn("menuVer",lun,dia,k,"Receta"):""}${esHoy&&!it.hecho?btn("menuComer",lun,dia,k,"La comimos","pri"):""}${pasado?"":btn("menuEditar",lun,dia,k,"Cambiar","",`Cambiar ${l.toLowerCase()} del ${DIAS_L[dia].toLowerCase()}`)}</div></div>`}).join("")}
+      ${vacios.length&&!pasado?`<div class="chips">${vacios.map(([k,l])=>`<button class="chip add" data-a="menuEditar" data-l="${lun}" data-d="${dia}" data-s="${k}">${l}</button>`).join("")}</div>`:""}
+      ${!llenos.length&&pasado?`<p class="small muted">Sin menú.</p>`:""}
+    </section>`}).join("")}`;
+};
+
 VISTAS.hoy=function(){
   const p=ui.persona,pf=perfil(p),f=hoyStr(),dk=diaKey(f);
   const c=comidasDe(p,f),e=entrenosDe(p,f),r=racha(p),mt=metas(p);
@@ -552,7 +652,8 @@ VISTAS.hoy=function(){
   else if(e.length)msg="Entreno anotado. Ahora que la comida acompañe.";
   else if(planE&&planE.tipo)msg=`Tu rutina de hoy dice ${(TIPO_N[planE.tipo]||"").toLowerCase()}${planE.min?" "+planE.min+" min":""}. Cuando lo hagas, anotalo con un toque.`;
   else msg=`Llevás ${c.length} ${c.length===1?"comida anotada":"comidas anotadas"} hoy${r>1?` y ${r} días de racha`:""}. Buen ritmo.`;
-  const planComidas=SLOTS.filter(([k])=>planC[k]&&planC[k].trim()&&!c.some(x=>x.slot===k));
+  const lunHoy=lunesDe(f),menuHoy=MENU_SLOTS.filter(([k])=>{const it=itemMenu(lunHoy,dk,k);return it&&!it.hecho});
+  const planComidas=SLOTS.filter(([k])=>planC[k]&&planC[k].trim()&&!c.some(x=>x.slot===k)&&!itemMenu(lunHoy,dk,k));
   const alerta=alertaBaja(p)&&ui.alertaOk!==p+hoyStr();
   const pendT=AI==="ok"?pendientesTabla().length:0;
   return `
@@ -577,6 +678,7 @@ VISTAS.hoy=function(){
     ${e.length?e.map(x=>filaEntreno(p,x,f)).join(""):`<p class="empty">${planE&&planE.tipo?"Todavía no lo anotaste.":"Hoy no hay entreno en tu rutina. Si te movés igual, anotalo."}</p>`}
     ${planE&&planE.tipo&&!e.length?`<div class="card plan"><div class="pt"><small>Según tu rutina</small>${esc(TIPO_N[planE.tipo])}${planE.min?" · "+planE.min+" min":""}${planE.desc?" · "+esc(planE.desc):""}</div><button class="btn sm" data-a="hiceRutina">Lo hice</button></div>`:""}
   </section>
+  ${menuHoy.length?bloqueMenuHoy(lunHoy,dk,menuHoy):""}
   ${planComidas.length?`<section class="sec"><h2>Tu plan de comidas para hoy</h2><div class="card">${planComidas.map(([k,l])=>`<div class="plan"><div class="pt"><small>${l}</small>${esc(planC[k])}</div><button class="btn sm" data-a="comiPlan" data-s="${k}">Lo comí</button></div>`).join("")}</div></section>`:""}`;
 };
 
@@ -670,7 +772,7 @@ function tarjetaReceta(r,i,src){
       <h4>Pasos</h4><ol>${(r.pasos||[]).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
     </details>
     <div class="row"><button class="btn sm pri" data-a="cocinamos" data-src="${src}" data-i="${i}">La cocinamos</button>${(r.faltan||[]).length?`<button class="btn sm" data-a="faltaCompra" data-src="${src}" data-i="${i}">Faltantes a la compra</button>`:""}</div>
-    <div class="row"><button class="btn sm" data-a="recRutina" data-src="${src}" data-i="${i}">Agregar a la rutina</button><button class="btn sm" data-a="recPlato" data-src="${src}" data-i="${i}">Guardar en platos</button></div>
+    <div class="row"><button class="btn sm" data-a="recMenu" data-src="${src}" data-i="${i}">Al menú</button><button class="btn sm" data-a="recRutina" data-src="${src}" data-i="${i}">Agregar a la rutina</button><button class="btn sm" data-a="recPlato" data-src="${src}" data-i="${i}">Guardar en platos</button></div>
   </article>`;
 }
 function vistaRecetas(){
@@ -784,7 +886,7 @@ const opciones=(g,lista,sel)=>`<div class="opts" data-g="${g}">${lista.map(([v,l
 function borrarDoble(btn,fn,txt){btn.addEventListener("click",()=>{if(btn.dataset.ok){fn()}else{btn.dataset.ok="1";btn.textContent=txt||"Tocá de nuevo para borrar"}})}
 
 /* ---------- Comida ---------- */
-function hojaComida({f,slot,id,pre,foto}){
+function hojaComida({f,slot,id,pre,foto,alGuardar}){
   const p=ui.persona,comp=companeros(p),pf=perfil(p);
   const nomComp=comp.map(x=>perfil(x).nombre).join(" y ");
   const ex=id?comidasDe(p,f).find(x=>x.id===id):null;
@@ -879,6 +981,7 @@ function hojaComida({f,slot,id,pre,foto}){
       if(guardarPlato&&base)agregarPlato(base);
       cambiarMes(p,f,d=>{const a=d.comidas[f]=(d.comidas[f]||[]).filter(x=>x.id!==e1.id);a.push(e1)},!!e2);
       extra.forEach(([x,ee],i)=>cambiarMes(x,f,d=>{(d.comidas[f]=d.comidas[f]||[]).push(ee)},i<extra.length-1));
+      if(alGuardar)alGuardar();
       cerrar();
       if(!base){const lista=[[p,e1],...extra];lista.forEach(([,e])=>estimando.add(e.id));render();
         estimar(texto,cant).then(r=>{lista.forEach(([pp,e])=>{estimando.delete(e.id);const m=pm(e.porcion);
@@ -1095,13 +1198,13 @@ function hojaGenerar(){
     pn.querySelector("#gOk").addEventListener("click",()=>{ui.filtros=new Set([...pn.querySelectorAll("#gF .chip")].filter(b=>b.getAttribute("aria-pressed")==="true").map(b=>b.dataset.k));ui.antojo=pn.querySelector("#gA").value.trim();cerrar();generar()});
   });
 }
-function hojaCocinamos(r){
+function hojaCocinamos(r,opt={}){
   const p=ui.persona,comp=companeros(p),pf=perfil(p);
   const dsp=despensa();const usados=dsp.filter(d=>{const n=norm(d.nombre);return (r.ingredientes||[]).some(i=>{const t=norm(i.item);return t.includes(n)||n.split(" ").some(w=>w.length>3&&t.includes(w))})});
   const porOpts=Object.entries(PORC).filter(([k])=>k!=="x").map(([k,o])=>[k,o.l]);
   abrir(`<h2>${esc(r.titulo)}</h2>
    <p class="small muted">Anotala como comida y actualizá la despensa en un paso.</p>
-   ${opciones("slot",SLOTS,slotPorHora())}
+   ${opciones("slot",SLOTS,opt.slot||slotPorHora())}
    ${comp.length?`<div class="fld"><span>¿Quiénes comieron?</span>${opciones("para",[["dos",comp.length===1?"Los dos":"Todos"],["yo","Solo "+pf.nombre]],"dos")}</div>`:""}
    <div class="fld"><span>Porción de ${esc(pf.nombre)}</span>${opciones("por",porOpts,"m")}</div>
    <div class="sublist" id="cP2">${comp.map(x=>`<div class="fld"><span>Porción de ${esc(perfil(x).nombre)}</span>${opciones("por2_"+x,porOpts,"m")}</div>`).join("")}</div>
@@ -1117,6 +1220,7 @@ function hojaCocinamos(r){
       if(todos)comp.forEach(x=>cambiarMes(x,f,d=>{(d.comidas[f]=d.comidas[f]||[]).push(mk(valGrupo(pn,"por2_"+x)||"m"))},true));
       const fin=[...pn.querySelectorAll("input[data-id]:checked")].map(i=>i.dataset.id);
       if(fin.length){const items=dsp.filter(d=>fin.includes(d.id));cambiarComp("despensa",d=>{d.items=(d.items||[]).filter(x=>!fin.includes(x.id))},true);if(q("#cBuy")&&q("#cBuy").checked)agregarACompras(items.map(x=>({nombre:x.nombre,cat:x.cat})),"se terminó")}
+      if(opt.alGuardar)opt.alGuardar();
       cerrar();render();aviso(`Anotada${todos?(comp.length===1?" para los dos":" para todos"):""}${fin.length?` · ${fin.length} ${fin.length===1?"ingrediente salió":"ingredientes salieron"} de la despensa`:""}`);
     });
   });
@@ -1336,6 +1440,13 @@ const A={
   fav:d=>{const r=recDe(d.src,d.i);if(!r)return;cambiarComp("recetas",x=>{x.favoritas=x.favoritas||[];const i=x.favoritas.findIndex(y=>norm(y.titulo)===norm(r.titulo));if(i>=0){x.favoritas.splice(i,1);aviso("Quitada de favoritas")}else{x.favoritas.push(clone(r));aviso("Guardada en favoritas")}})},
   cocinamos:d=>{const r=recDe(d.src,d.i);if(r)hojaCocinamos(r)},
   faltaCompra:d=>{const r=recDe(d.src,d.i);if(!r)return;const n=agregarACompras((r.faltan||[]).map(x=>({nombre:x})),r.titulo);aviso(n?`${n} ${n===1?"producto sumado":"productos sumados"} a la compra`:"Ya estaban en la lista")},
+  recMenu:d=>{const r=recDe(d.src,d.i);if(r)hojaRecMenu(r)},
+  semNav:d=>{ui.semana=addDays(ui.semana||lunesDe(hoyStr()),+d.d);render();window.scrollTo(0,0)},
+  semTodo:()=>{ui.menuTodo=!ui.menuTodo;render()},
+  semCompra:()=>compraDelMenu(ui.semana||lunesDe(hoyStr())),
+  menuEditar:d=>hojaMenu(d.l,d.d,d.s),
+  menuVer:d=>{const it=itemMenu(d.l,d.d,d.s);if(it)hojaRecetaMenu(it)},
+  menuComer:d=>comerDelMenu(d.l,d.d,d.s),
   recRutina:d=>{const r=recDe(d.src,d.i);if(r)hojaRecRutina(r)},
   recPlato:d=>{const r=recDe(d.src,d.i);if(!r)return;cambiarComp("platos",x=>{x.items=x.items||[];if(!x.items.some(y=>norm(y.nombre)===norm(r.titulo)))x.items.push({id:uid(),nombre:r.titulo,kcal:r.kcal,prot:r.prot,veg:+r.veg||0,ultra:false})});aviso("Guardado en tus platos")},
   nuevaCompra:()=>hojaCompra(),
