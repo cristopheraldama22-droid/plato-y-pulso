@@ -133,7 +133,7 @@ El plan gratis de Supabase no hace copias diarias. El repositorio trae un respal
 
 ## Privacidad (Ley 18.331)
 
-- La app pide consentimiento expreso la primera vez que alguien entra y lo registra en la tabla `consentimientos` con la versión aceptada. Si cambiás `web/privacidad.html` de forma importante, subí `PRIV_V` en `web/app.js` para que se vuelva a pedir.
+- La app pide consentimiento expreso la primera vez que alguien entra y lo registra en la tabla `consentimientos` con la versión aceptada. Si cambiás `web/privacidad.html` (se publica como `/privacidad`) de forma importante, subí `PRIV_V` en `web/app.js` para que se vuelva a pedir.
 - Cada persona puede borrar su cuenta y sus datos desde **Ajustes › Eliminar mi cuenta y mis datos**.
 - Antes de vender a clientes: hacé revisar la política por un abogado e **inscribí la base de datos en la URCDP** (es obligatorio para bases con datos personales en Uruguay).
 

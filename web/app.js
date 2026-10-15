@@ -459,7 +459,7 @@ function renderEntrada(){
       <p class="muted">${esc(nombreApp())} guarda datos de salud: lo que comés, tu peso y medidas, y tus entrenamientos. Por eso necesitamos tu consentimiento expreso.</p></section>
     <section class="card sec">
       <p class="small">Resumen: tus datos se usan solo para que la app funcione. Los ven las personas de tus espacios según cómo esté configurado cada uno (en un hogar, todos; en un grupo profesional, vos y quienes son profesionales). Para estimar comidas y armar recetas, el texto o la foto se envía a un servicio de IA. No vendemos tus datos. Podés borrar tu cuenta y todos tus datos cuando quieras desde Ajustes.</p>
-      <p class="small"><a href="privacidad.html" target="_blank" rel="noopener">Leer la política de privacidad completa</a></p>
+      <p class="small"><a href="privacidad" target="_blank" rel="noopener">Leer la política de privacidad completa</a></p>
       <label class="chk"><input type="checkbox" id="pvA"> Leí y acepto la política de privacidad.</label>
       <label class="chk"><input type="checkbox" id="pvB"> Doy mi consentimiento expreso para que se traten mis datos de salud con estos fines.</label>
       <button class="btn pri wide" data-a="privAceptar" ${entrada.ocupado?"disabled":""}>${entrada.ocupado?"Guardando…":"Aceptar y seguir"}</button>
@@ -1213,7 +1213,7 @@ async function hojaAjustes(){
    <section class="sec"><h3>Cuenta</h3><p class="small muted">${esc(SESION?SESION.email:"")}</p>
     <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="salir">Cerrar sesión</button></div>
     ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}
-    <p class="small"><a href="privacidad.html" target="_blank" rel="noopener">Política de privacidad</a></p>
+    <p class="small"><a href="privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
     ${B.modo==="nube"?`<button class="btn warn" id="ajBorrarCuenta">Eliminar mi cuenta y mis datos</button><p class="hint">Borra tu usuario, tus datos y los espacios donde estás solo. No se puede deshacer: si querés, descargá antes un respaldo.</p>`:""}</section>
    <section class="sec"><h3>Sobre las estimaciones</h3>
     <p class="hint">Las calorías, proteínas y porciones de verdura las estima una IA (o una tabla base cuando no hay IA), siempre aproximadas. Cada plato estimado se recuerda para que el mismo plato dé siempre el mismo número, y tus correcciones a mano pisan ese valor. Nada de esto es consejo médico.</p>
