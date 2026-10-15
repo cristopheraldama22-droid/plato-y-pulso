@@ -437,6 +437,18 @@ const vistaBloqueo=()=>"";
    ========================================================= */
 const TIPOS_ESP=[["hogar","Hogar"],["personal","Personal"]];
 const entrada={email:lsGet("pp:email")||"",paso:"email",ocupado:false,error:""};
+/* ---------- Anti-robots al pedir el código (Cloudflare Turnstile), solo si config.js tiene la clave ---------- */
+let captchaToken="",captchaId=null,captchaJs=null;
+const captchaClave=()=>(window.PP_CONFIG||{}).turnstileSiteKey||"";
+function montarCaptcha(){
+  const el=$("#cfTs");if(!el||!captchaClave()||!B||B.modo!=="nube")return;
+  if(!captchaJs)captchaJs=new Promise((ok,mal)=>{const s=document.createElement("script");s.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";s.async=true;s.onload=ok;s.onerror=mal;document.head.appendChild(s)});
+  captchaJs.then(()=>{const t=window.turnstile;if(!t||!el.isConnected)return;
+    if(captchaId!==null){try{t.remove(captchaId)}catch(e){}}
+    captchaToken="";
+    captchaId=t.render(el,{sitekey:captchaClave(),language:"es",theme:"auto",size:"flexible",callback:v=>{captchaToken=v},"expired-callback":()=>{captchaToken=""},"error-callback":()=>{captchaToken=""}});
+  }).catch(()=>{});
+}
 function renderEntrada(){
   document.body.classList.add("entrada");
   $("#who").hidden=true;$("#tabs").innerHTML="";$("#sync").textContent=B&&B.modo==="demo"?"Demo":"";
@@ -448,11 +460,13 @@ function renderEntrada(){
     h=`<section class="sec hero"><p class="eyebrow">Comida, entreno y hábitos</p><h1>${esc(nombreApp())}</h1><p class="muted">Anotá lo que comés y entrenás, con estimaciones de calorías y proteínas y recetas con lo que tenés en casa.</p></section>
     <section class="card sec">${entrada.paso==="email"
       ?`<label class="fld"><span>Tu mail</span><input class="inp" id="lgE" type="email" autocomplete="email" inputmode="email" value="${esc(entrada.email)}" placeholder="nombre@correo.com"></label>
+        <div id="cfTs" class="captcha"></div>
         <button class="btn pri wide" data-a="lgEnviar" ${entrada.ocupado?"disabled":""}>${entrada.ocupado?"Enviando…":B.modo==="demo"?"Entrar a la demo":"Enviarme un código"}</button>
         <p class="hint">${B.modo==="demo"?"Modo demo: los datos quedan solo en este navegador.":"Te mandamos un código de 6 números. No hace falta contraseña."}</p>`
       :`<p>Te mandamos un código a <b>${esc(entrada.email)}</b>. Revisá también la carpeta de spam.</p>
         <label class="fld"><span>Código</span><input class="inp" id="lgC" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></label>
         <button class="btn pri wide" data-a="lgVerificar" ${entrada.ocupado?"disabled":""}>${entrada.ocupado?"Verificando…":"Entrar"}</button>
+        <div id="cfTs" class="captcha"></div>
         <div class="row tight"><button class="link" data-a="lgOtro">Usar otro mail</button><button class="link" data-a="lgEnviar">Reenviar código</button></div>`}
       ${entrada.error?`<p class="alert small">${esc(entrada.error)}</p>`:""}
     </section>`;
@@ -485,6 +499,7 @@ function renderEntrada(){
   }
   $("#app").innerHTML=h;
   const t=$('#app [data-g="tipoEsp"]');if(t)t.addEventListener("click",e=>{const o=e.target.closest(".opt");if(!o)return;t.querySelectorAll(".opt").forEach(b=>b.setAttribute("aria-pressed",String(b===o)))});
+  montarCaptcha();
   const foco=$("#lgC")||$("#lgE");if(foco&&!foco.value)setTimeout(()=>foco.focus(),50);
   ["#lgE","#lgC"].forEach(s=>{const i=$(s);if(i)i.addEventListener("keydown",e=>{if(e.key==="Enter")(s==="#lgE"?A.lgEnviar:A.lgVerificar)()})});
 }
@@ -1470,8 +1485,10 @@ const A={
   ajustes:()=>{if(ETAPA==="app")hojaAjustes()},
   lgEnviar:async()=>{const i=$("#lgE");const em=(i?i.value:entrada.email).trim().toLowerCase();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){entrada.error="Escribí un mail válido.";render();return}
+    if(captchaClave()&&B.modo==="nube"&&!captchaToken){entrada.error="Esperá a que termine la verificación de seguridad (el recuadro de arriba del botón).";render();return}
+    const tk=captchaToken;captchaToken="";
     entrada.email=em;lsSet("pp:email",em);entrada.ocupado=true;entrada.error="";render();
-    try{await B.enviarCodigo(em);
+    try{await B.enviarCodigo(em,tk);
       if(B.modo==="demo"){await B.verificarCodigo(em,"");SESION=await B.sesion();entrada.ocupado=false;await alEntrar();return}
       entrada.paso="codigo";aviso("Código enviado a "+em)}catch(e){entrada.error=e.message}
     entrada.ocupado=false;render()},

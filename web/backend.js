@@ -25,7 +25,7 @@ function nube(cfg){
     modo:"nube",
     async sesion(){const {data}=await sb.auth.getSession();return data.session?{email:data.session.user.email,id:data.session.user.id}:null},
     alCambiarSesion(cb){sb.auth.onAuthStateChange((ev)=>{if(ev==="SIGNED_IN"||ev==="SIGNED_OUT")cb(ev)})},
-    async enviarCodigo(email){const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});if(error)throw new ErrorApp("auth",/rate|seconds/i.test(error.message)?"Esperá un minuto antes de pedir otro código.":error.message)},
+    async enviarCodigo(email,captchaToken){const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname,...(captchaToken?{captchaToken}:{})}});if(error)throw new ErrorApp("auth",/rate|seconds/i.test(error.message)?"Esperá un minuto antes de pedir otro código.":error.message)},
     async verificarCodigo(email,token){const {error}=await sb.auth.verifyOtp({email,token,type:"email"});if(error)throw new ErrorApp("auth","El código no es correcto o venció. Pedí uno nuevo.")},
     async salir(){await sb.auth.signOut()},
     async salirTodos(){const {error}=await sb.auth.signOut({scope:"global"});if(error)throw errDe(error)},

@@ -137,6 +137,20 @@ El plan gratis de Supabase no hace copias diarias. El repositorio trae un respal
 - Cada persona puede borrar su cuenta y sus datos desde **Ajustes › Eliminar mi cuenta y mis datos**.
 - Antes de vender a clientes: hacé revisar la política por un abogado e **inscribí la base de datos en la URCDP** (es obligatorio para bases con datos personales en Uruguay).
 
+## Seguridad (lista de control)
+
+**Ya hecho en el código y la base:** reglas por fila en todas las tablas; sin permisos para usuarios sin sesión; funciones del servidor que verifican la sesión, el origen y los topes; CSP, HSTS y protección contra marcos en la web; respaldos cifrados; versiones fijas en el respaldo automático.
+
+**Ajustes manuales (una sola vez):**
+- **Verificación en dos pasos** en Supabase, Cloudflare, GitHub, Resend, Anthropic y Google.
+- **Cloudflare › SSL/TLS › Edge Certificates:** *Minimum TLS Version* = 1.2. Para que `http://` pase a `https://` solo en la app: **Rules › Redirect Rules** con la condición *Hostname = plato.tudominio.com* y *SSL/HTTPS = Off* → redirección dinámica a `concat("https://", http.host, http.request.uri)`, código 301 (o *Always Use HTTPS* si no afecta al sitio principal).
+- **Cloudflare › DNS › Settings › DNSSEC:** activarlo (si el dominio está registrado en otro lado, cargar ahí el registro DS que muestra).
+- **Anti-robots (Turnstile):** Cloudflare › **Turnstile › Add widget** con el dominio de la app (modo *Managed*). La **clave pública** va en `web/config.js` (`turnstileSiteKey`) y se publica; **después**, en Supabase › Authentication › **Attack Protection**, activar *Captcha* con Turnstile y la **clave secreta**. En ese orden: si se activa primero en Supabase, nadie puede pedir el código.
+- **Supabase › Database › Settings:** *Enforce SSL on incoming connections* activado.
+- **Resend:** API key con permiso *Sending access* solo para el dominio de envío. **Anthropic:** tope de gasto mensual.
+- **DMARC del dominio principal:** si el dominio raíz no manda mails, `_dmarc` → `v=DMARC1; p=reject;` y SPF `v=spf1 -all`, para que nadie mande mails falsos a su nombre.
+- **Más adelante:** cuando las funciones usen las claves nuevas de Supabase, desactivar las claves *legacy* (anon y service_role) en Project Settings › API Keys.
+
 ## Límites del plan gratis de Supabase (a tener en cuenta)
 
 - 500 MB de base de datos y 2 proyectos activos.

@@ -283,3 +283,5 @@ p.alert{color:var(--warn);font-weight:600}
 /* Enviar comentario */
 .feedback{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:24px;padding:14px;border:1px dashed var(--line);border-radius:var(--r)}
 textarea.inp{min-height:120px;padding:12px 14px;resize:vertical;line-height:1.45}
+.captcha:empty{display:none}
+.captcha{min-height:65px}

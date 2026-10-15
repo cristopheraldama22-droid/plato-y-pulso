@@ -5,5 +5,6 @@
 window.PP_CONFIG = {
   supabaseUrl: "https://ozciicrxridojhhdtxcq.supabase.co",
   supabaseAnonKey: "sb_publishable_Aby-LM8baNH44ETh5-SdVw_yxeW6t6g",   // clave pública (publishable)
-  demo: false
+  demo: false,
+  turnstileSiteKey: ""   // clave pública de Cloudflare Turnstile (anti-robots al pedir el código); vacío = apagado
 };

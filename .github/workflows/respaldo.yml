@@ -26,9 +26,9 @@ jobs:
           set -euo pipefail
           test -n "$DB_URL" || { echo "Falta el secreto SUPABASE_DB_URL"; exit 1; }
           mkdir respaldo && cd respaldo
-          npx -y supabase@2 db dump --db-url "$DB_URL" --role-only -f roles.sql
-          npx -y supabase@2 db dump --db-url "$DB_URL" -f esquema.sql
-          npx -y supabase@2 db dump --db-url "$DB_URL" --data-only --use-copy --schema public,auth -f datos.sql
+          npx -y supabase@2.121.0 db dump --db-url "$DB_URL" --role-only -f roles.sql
+          npx -y supabase@2.121.0 db dump --db-url "$DB_URL" -f esquema.sql
+          npx -y supabase@2.121.0 db dump --db-url "$DB_URL" --data-only --use-copy --schema public,auth -f datos.sql
           ls -la
 
       - name: Cifrar
@@ -42,7 +42,7 @@ jobs:
           rm -rf respaldo respaldo.tar.gz
 
       - name: Guardar
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
         with:
           name: respaldo-${{ github.run_number }}
           path: respaldo-*.tar.gz.gpg
