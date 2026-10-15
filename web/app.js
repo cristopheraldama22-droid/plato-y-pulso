@@ -40,10 +40,27 @@ const sumBy=(a,k)=>a.reduce((s,x)=>s+(isNum(x[k])?+x[k]:0),0);
 const SLOTS=[["desayuno","Desayuno"],["almuerzo","Almuerzo"],["merienda","Merienda"],["cena","Cena"],["snacks","Snacks"]];
 const SLOT_N=Object.fromEntries(SLOTS);
 const SLOT_LIM={desayuno:11,almuerzo:15.5,merienda:19.5,cena:23.5};
-const TIPOS=[["gimnasio","Gimnasio"],["bici","Bici"],["caminar","Caminar"],["correr","Correr"]];
+/* Actividades: [id, nombre, grupo, MET suave/media/intensa]. MET aproximados del Compendio de Actividad Física (2024).
+   Grupos: fuerza (ejercicios con series y kilos), dist (tiempo y distancia), dep (deportes), clase, otro (nombre libre). */
+const ACTIV=[
+ ["gimnasio","Gimnasio","fuerza",[3.5,5,6]],["calistenia","Calistenia","fuerza",[3.8,5,8]],["funcional","Funcional / Crossfit","fuerza",[5,6.5,8]],
+ ["correr","Correr","dist",[7,9.8,11.5]],["caminar","Caminar","dist",[2.8,3.5,4.5]],["bici","Bici","dist",[4,6.8,9]],["nadar","Natación","dist",[5.8,8,9.8]],
+ ["trekking","Trekking","dist",[5.3,6,7.8]],["remo","Remo","dist",[4.8,7,8.5]],["patin","Patín","dist",[5,7,9.8]],
+ ["futbol","Fútbol","dep",[5,7,10]],["padel","Pádel","dep",[5,6,7.3]],["tenis","Tenis","dep",[5,7.3,8]],["basquet","Básquet","dep",[4.5,6.5,8]],
+ ["voley","Vóley","dep",[3,4,6]],["handball","Handball","dep",[6,8,12]],["hockey","Hockey","dep",[5,7,8]],["rugby","Rugby","dep",[6.3,8.3,10]],
+ ["yoga","Yoga","clase",[2.5,3,4]],["pilates","Pilates","clase",[2.8,3,3.8]],["spinning","Spinning","clase",[6.8,8.5,11]],["baile","Baile / Zumba","clase",[4.5,6.5,7.8]],
+ ["boxeo","Boxeo / Artes marciales","clase",[5.5,7.8,10.3]],["estiramiento","Estiramiento / movilidad","clase",[2.3,2.5,3]],
+ ["otro","Otra actividad","otro",[3.5,5,7]]
+];
+const GRUPOS_ACT=[["fuerza","Fuerza"],["dist","Distancia"],["dep","Deportes"],["clase","Clases"],["otro","Otra"]];
+const TIPOS=ACTIV.map(a=>[a[0],a[1]]);
 const TIPO_N=Object.fromEntries(TIPOS);
+const grupoAct=t=>(ACTIV.find(a=>a[0]===t)||[0,0,"otro"])[2];
+const enMetros=t=>t==="nadar";
+const nombreAct=e=>e&&e.tipo==="otro"&&e.nombre?e.nombre:(TIPO_N[e&&e.tipo]||(e&&e.tipo)||"Entreno");
+const fmtDist=(t,km)=>enMetros(t)?fmtN(Math.round(km*1000))+" m":nf1.format(km)+" km";
 const INTS=[["suave","Suave"],["media","Media"],["alta","Intensa"]];
-const MET={gimnasio:{suave:3.5,media:5,alta:6},bici:{suave:4,media:6.8,alta:9},caminar:{suave:2.8,media:3.5,alta:4.5},correr:{suave:7,media:9.8,alta:11.5}};
+const MET=Object.fromEntries(ACTIV.map(([k,,,v])=>[k,{suave:v[0],media:v[1],alta:v[2]}]));
 const OBJ={mantener:"Mantenerme / comer mejor",musculo:"Ganar músculo"};
 const ACT=[["sentado","Sentado casi todo el día"],["depie","De pie o caminando parte del día"],["fisico","Trabajo físico o muy activo"]];
 const PAL={sentado:1.25,depie:1.4,fisico:1.6};
@@ -229,13 +246,50 @@ function frecuentes(p,slot){
   return Object.values(m).filter(o=>o.n>=1).sort((a,b)=>b.n-a.n).slice(0,6);
 }
 const e1rm=s=>{const kg=+s.kg||0,r=+s.r||0;return kg?(r>1?kg*(1+r/30):kg):0};
+/* Progreso por disciplina (últimos 90 días): constancia, minutos, distancia y ritmo. */
+function progresoDisciplinas(p){
+  const hoy=hoyStr(),lista=[];for(let i=0;i<91;i++){const f=addDays(hoy,-i);entrenosDe(p,f).forEach(e=>lista.push({e,f}))}
+  if(!lista.length)return `<p class="empty">Registrá tus entrenos y acá vas a ver tu constancia, minutos por actividad, distancias y ritmos.</p>`;
+  const en=(d0,d1)=>lista.filter(x=>x.f>addDays(hoy,-d0)&&x.f<=addDays(hoy,-d1));
+  const ult30=en(30,0),prev30=en(60,30);
+  // constancia: semanas seguidas con al menos un entreno
+  const semanas=new Set(lista.map(x=>lunesDe(x.f)));let racha=0,w=lunesDe(hoy);if(!semanas.has(w))w=addDays(w,-7);while(semanas.has(w)){racha++;w=addDays(w,-7)}
+  const porAct={};ult30.forEach(({e})=>{const k=e.tipo==="otro"&&e.nombre?"otro:"+e.nombre:e.tipo;const o=porAct[k]||(porAct[k]={n:nombreAct(e),min:0,ses:0});o.min+=+e.min||0;o.ses++});
+  const acts=Object.values(porAct).sort((a,b)=>b.min-a.min),maxMin=Math.max(1,...acts.map(a=>a.min));
+  const minT=sumBy(ult30.map(x=>x.e),"min"),minP=sumBy(prev30.map(x=>x.e),"min"),dif=minP?Math.round((minT-minP)/minP*100):null;
+  const semanasAtras=n=>Array.from({length:n},(_,i)=>addDays(lunesDe(hoy),-7*(n-1-i)));
+  const general=`<section class="card sec"><h2>Últimos 30 días</h2>
+    <div class="tiles"><div class="tile g"><span class="lab muted">Entrenos</span><span class="num">${ult30.length}</span><span class="small muted">${fmtN(minT)} min${dif!==null?` · <span class="${dif>0?"up":dif<0?"down":"muted"}">${dif>0?"+":""}${dif}% vs. mes anterior</span>`:""}</span></div>
+    <div class="tile g"><span class="lab muted">Constancia</span><span class="num">${racha}</span><span class="small muted">${racha===1?"semana seguida":"semanas seguidas"} entrenando</span></div></div>
+    ${acts.length?acts.map(a=>`<div class="barra"><span>${esc(a.n)}</span><div class="meter" style="color:var(--accent)"><i style="width:${Math.max(4,Math.round(a.min/maxMin*100))}%"></i></div><small>${fmtN(a.min)} min · ${a.ses}</small></div>`).join(""):`<p class="small muted">Sin entrenos en los últimos 30 días.</p>`}
+  </section>`;
+  // tarjetas por disciplina (90 días)
+  const tipos=[...new Set(lista.map(x=>x.e.tipo))];
+  const tarjetas=tipos.map(t=>{const xs=lista.filter(x=>x.e.tipo===t),g=grupoAct(t),sem=semanasAtras(8);
+    const titulo=t==="otro"?"Otras actividades":TIPO_N[t]||t;
+    if(g==="dist"){const conD=xs.filter(x=>+x.e.km>0);const kmMes=sumBy(xs.filter(x=>x.f.slice(0,7)===hoy.slice(0,7)).map(x=>x.e),"km");
+      const mejor=conD.reduce((a,x)=>!a||+x.e.km>+a.e.km?x:a,null);
+      const ritmo=x=>+x.e.min/(enMetros(t)?(+x.e.km*10):+x.e.km);   // min/km, o min/100 m en natación
+      const rap=conD.filter(x=>+x.e.min>0).reduce((a,x)=>!a||ritmo(x)<ritmo(a)?x:a,null);
+      const fmtR=x=>{const r=ritmo(x),mm=Math.floor(r),ss=Math.round((r-mm)*60);return `${mm}:${String(ss===60?59:ss).padStart(2,"0")} min/${enMetros(t)?"100 m":"km"}`};
+      return `<div class="prog"><div class="ph"><b>${esc(titulo)}</b><span class="small muted">${xs.length} ${xs.length===1?"sesión":"sesiones"} en 90 días</span></div>
+        ${conD.length?`<span class="small">Este mes: <b>${kmMes?fmtDist(t,kmMes):"—"}</b>${mejor?` · Más larga: <b>${fmtDist(t,+mejor.e.km)}</b> (${fechaCorta(mejor.f)})`:""}</span>
+        ${rap?`<span class="small">Mejor ritmo: <b>${fmtR(rap)}</b> (${fechaCorta(rap.f)})</span>`:""}
+        ${spark(sem.map(w=>sumBy(xs.filter(x=>lunesDe(x.f)===w).map(x=>x.e),"km")))}<span class="small muted">Distancia por semana (8 semanas)</span>`
+        :`<span class="small muted">Cargá la distancia al registrar y vas a ver kilómetros y ritmo.</span>`}</div>`}
+    const m30=sumBy(xs.filter(x=>x.f>addDays(hoy,-30)).map(x=>x.e),"min"),s30=xs.filter(x=>x.f>addDays(hoy,-30)).length;
+    return `<div class="prog"><div class="ph"><b>${esc(titulo)}</b><span class="small muted">${xs.length} ${xs.length===1?"sesión":"sesiones"} en 90 días</span></div>
+      <span class="small">Últimos 30 días: <b>${s30} ${s30===1?"sesión":"sesiones"} · ${fmtN(m30)} min</b></span>
+      ${spark(sem.map(w=>sumBy(xs.filter(x=>lunesDe(x.f)===w).map(x=>x.e),"min")))}<span class="small muted">Minutos por semana (8 semanas)</span></div>`}).join("");
+  return general+(tarjetas?`<h2 class="sub">Por actividad</h2><section class="card">${tarjetas}</section>`:"");
+}
 function progreso(p){
   const h=hoyStr();const m={};
   for(let i=180;i>=0;i--){const f=addDays(h,-i);entrenosDe(p,f).forEach(e=>(e.ejercicios||[]).forEach(x=>{const k=norm(x.n);if(!k)return;const o=m[k]||(m[k]={nombre:x.n,ses:[]});const v=e1rm(x);o.ses.push({f,s:+x.s||0,r:+x.r||0,kg:+x.kg||0,v,score:v||(+x.r||0)})}))}
   return Object.values(m).map(o=>{o.last=o.ses[o.ses.length-1];o.first=o.ses[0];o.best=o.ses.reduce((a,b)=>b.score>a.score?b:a,o.ses[0]);return o}).sort((a,b)=>b.last.f.localeCompare(a.last.f));
 }
 function nombresEjercicios(p){const s=new Set();progreso(p).forEach(o=>s.add(o.nombre));return [...s]}
-function ultimoGimnasio(p,antesDe){const h=antesDe||hoyStr();for(let i=0;i<120;i++){const f=addDays(h,-i);const g=entrenosDe(p,f).filter(e=>e.tipo==="gimnasio"&&(e.ejercicios||[]).length);if(g.length)return {f,e:g[g.length-1]}}return null}
+function ultimoGimnasio(p,antesDe){const h=antesDe||hoyStr();for(let i=0;i<120;i++){const f=addDays(h,-i);const g=entrenosDe(p,f).filter(e=>grupoAct(e.tipo)==="fuerza"&&(e.ejercicios||[]).length);if(g.length)return {f,e:g[g.length-1]}}return null}
 
 /* =========================================================
    Claude: estimaciones, foto, recetas, compras
@@ -542,8 +596,8 @@ function bloqueCalidad(p,f){
   </section>`;
 }
 function filaEntreno(p,e,f){
-  const det=[e.km?nf1.format(e.km)+" km":"",(e.ejercicios||[]).length?(e.ejercicios.length+" ejercicios"):"",INTS.find(i=>i[0]===e.int)?INTS.find(i=>i[0]===e.int)[1].toLowerCase():"","~"+fmtN(entKcal(p,e))+" kcal"].filter(Boolean).join(" · ");
-  return `<button class="entry" data-a="editEntreno" data-f="${f}" data-id="${e.id}"><span class="et"><b>${esc(TIPO_N[e.tipo]||e.tipo)}${e.desc?" · "+esc(e.desc):""}</b><small>${fechaCorta(f)} · ${det}</small></span><span class="ev"><span class="num" style="font-size:22px">${fmtN(e.min)}</span><span class="tag">min</span></span></button>`;
+  const det=[e.km?fmtDist(e.tipo,e.km):"",(e.ejercicios||[]).length?(e.ejercicios.length+" ejercicios"):"",INTS.find(i=>i[0]===e.int)?INTS.find(i=>i[0]===e.int)[1].toLowerCase():"","~"+fmtN(entKcal(p,e))+" kcal"].filter(Boolean).join(" · ");
+  return `<button class="entry" data-a="editEntreno" data-f="${f}" data-id="${e.id}"><span class="et"><b>${esc(nombreAct(e))}${e.desc?" · "+esc(e.desc):""}</b><small>${fechaCorta(f)} · ${det}</small></span><span class="ev"><span class="num" style="font-size:22px">${fmtN(e.min)}</span><span class="tag">min</span></span></button>`;
 }
 function spark(vals){
   if(vals.length<2)return "";
@@ -718,11 +772,11 @@ VISTAS.comidas=function(){
 VISTAS.entrenos=function(){
   const p=ui.persona,hoy=hoyStr();
   const head=`<section class="sec"><h1>Entrenos</h1>
-    <div class="seg"><button data-a="entSeg" data-e="historial" aria-pressed="${ui.ent==="historial"}">Historial</button><button data-a="entSeg" data-e="progreso" aria-pressed="${ui.ent==="progreso"}">Progreso en el gimnasio</button></div>
+    <div class="seg"><button data-a="entSeg" data-e="historial" aria-pressed="${ui.ent==="historial"}">Historial</button><button data-a="entSeg" data-e="progreso" aria-pressed="${ui.ent==="progreso"}">Progreso</button></div>
     <button class="btn pri wide" data-a="nuevoEntreno" data-f="${hoy}">+ Registrar entreno</button></section>`;
   if(ui.ent==="progreso"){
     const pr=progreso(p);
-    return head+(pr.length?`<section class="card">${pr.map(o=>{const L=o.last,F=o.first;const usaKg=o.ses.some(s=>s.kg);const d=usaKg?(L.v-F.v):(L.r-F.r);
+    return head+progresoDisciplinas(p)+(pr.length?`<h2 class="sub">Fuerza: ejercicios</h2>`:"")+(pr.length?`<section class="card">${pr.map(o=>{const L=o.last,F=o.first;const usaKg=o.ses.some(s=>s.kg);const d=usaKg?(L.v-F.v):(L.r-F.r);
       return `<div class="prog"><div class="ph"><b>${esc(o.nombre)}</b><span class="small muted">${o.ses.length} ${o.ses.length===1?"sesión":"sesiones"}</span></div>
       <span class="small">Última (${fechaCorta(L.f)}): <b>${L.s||"?"}×${L.r||"?"}${L.kg?" · "+nf1.format(L.kg)+" kg":" · peso corporal"}</b></span>
       <span class="small">${usaKg?`Mejor marca estimada: <b>~${nf1.format(o.best.v)} kg</b> a 1 repetición`:`Mejor: <b>${o.best.r} repeticiones</b>`}${o.ses.length>1?` · <span class="${d>0?"up":d<0?"down":"muted"}">${d>0?"+":""}${nf1.format(d)} ${usaKg?"kg":"reps"} desde el ${fechaCorta(F.f)}</span>`:""}</span>
@@ -1100,6 +1154,18 @@ function hojaComida({f,slot,id,pre,foto,alGuardar}){
 }
 
 /* ---------- Entreno ---------- */
+function actividadesFrecuentes(p){
+  const c={};for(let i=0;i<120;i++)entrenosDe(p,addDays(hoyStr(),-i)).forEach(e=>{c[e.tipo]=(c[e.tipo]||0)+1});
+  const usadas=Object.keys(c).filter(k=>TIPO_N[k]).sort((a,b)=>c[b]-c[a]);
+  return [...new Set([...usadas,"gimnasio","correr","caminar","bici","nadar","padel","futbol","yoga"])].slice(0,8);
+}
+function selectorActividad(p,sel){
+  const frec=actividadesFrecuentes(p);if(sel&&!frec.includes(sel))frec.unshift(sel);
+  const btn=(k,l,extra)=>`<button type="button" class="opt${extra?" mas":""}" data-v="${k}" aria-pressed="${k===sel}">${l}</button>`;
+  return `<div class="fld"><span>Actividad</span><div class="opts acts" data-g="tipo">${frec.map(k=>btn(k,TIPO_N[k])).join("")}
+    ${GRUPOS_ACT.map(([g,gl])=>{const resto=ACTIV.filter(a=>a[2]===g&&!frec.includes(a[0]));return resto.length?`<span class="optg mas">${gl}</span>${resto.map(a=>btn(a[0],a[1],1)).join("")}`:""}).join("")}
+  </div><button type="button" class="link" id="eMas">Más actividades</button></div>`;
+}
 function hojaEntreno({f,id,pre}){
   const p=ui.persona,pf=perfil(p);
   const ex=id?entrenosDe(p,f).find(x=>x.id===id):null;
@@ -1107,15 +1173,16 @@ function hojaEntreno({f,id,pre}){
   let ejs=(v.ejercicios||[]).map(x=>({...x}));
   abrir(`<h2>${ex?"Editar entreno":"Registrar entreno"}</h2>
    <p class="small muted">${esc(pf.nombre)}</p>
-   ${opciones("tipo",TIPOS,v.tipo)}
+   ${selectorActividad(p,v.tipo)}
+   <label class="fld" id="eNomL"><span>¿Qué actividad?</span><input class="inp" id="eNom" maxlength="40" value="${esc(v.nombre||"")}" placeholder="Ej: surf, escalada"></label>
    <div class="fld"><span>Intensidad</span>${opciones("int",INTS,v.int||"media")}</div>
    <div class="two"><label class="fld"><span>Duración (min)</span><input class="inp" id="eM" inputmode="numeric" value="${esc(v.min)}"></label>
    <label class="fld"><span>Fecha</span><input class="inp" id="eF" type="date" value="${f}" max="${hoyStr()}"></label></div>
    <div class="chips" id="eChips">${[20,30,45,60,90].map(m=>`<button type="button" class="chip" data-m="${m}">${m} min</button>`).join("")}</div>
-   <label class="fld" id="eKmL"><span>Distancia (km, opcional)</span><input class="inp" id="eKm" inputmode="decimal" value="${v.km?nf1.format(v.km):""}" placeholder="Ej: 4,5"></label>
+   <label class="fld" id="eKmL"><span id="eKmT">Distancia (km, opcional)</span><input class="inp" id="eKm" inputmode="decimal" value="${v.km?(enMetros(v.tipo)?Math.round(v.km*1000):nf1.format(v.km)):""}" placeholder="Ej: 4,5"></label>
    <label class="fld"><span>Descripción</span><input class="inp" id="eD" value="${esc(v.desc)}" placeholder="Ej: pierna y core, me sentí bien · 4 km tranquilo"></label>
    <div class="sublist" id="eGym">
-     <div class="sec-h"><b>Ejercicios</b><button type="button" class="link" id="eCopy">Copiar del último gimnasio</button></div>
+     <div class="sec-h"><b>Ejercicios</b><button type="button" class="link" id="eCopy">Copiar del último entreno de fuerza</button></div>
      <datalist id="dlEx">${nombresEjercicios(p).map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
      <div class="exlist" id="eList"></div>
      <button type="button" class="btn sm" id="eAdd">+ Ejercicio</button>
@@ -1127,7 +1194,9 @@ function hojaEntreno({f,id,pre}){
     const q=s=>pn.querySelector(s);const m=q("#eM"),list=q("#eList");
     const leerEjs=()=>{ejs=[...list.querySelectorAll(".ex")].map(r=>({n:r.querySelector(".exn input").value.trim(),s:numIn(r.querySelector("[data-k=s]").value)||"",r:numIn(r.querySelector("[data-k=r]").value)||"",kg:numIn(r.querySelector("[data-k=kg]").value)??""}))};
     const pintarEjs=()=>{list.innerHTML=ejs.map((x,i)=>`<div class="ex"><label class="exn">Ejercicio<input class="inp" list="dlEx" value="${esc(x.n||"")}" placeholder="Ej: sentadilla"></label><label>Series<input class="inp" data-k="s" inputmode="numeric" value="${esc(x.s||"")}"></label><label>Reps<input class="inp" data-k="r" inputmode="numeric" value="${esc(x.r||"")}"></label><label>Kg<input class="inp" data-k="kg" inputmode="decimal" value="${x.kg===""||x.kg===undefined?"":esc(nf1.format(x.kg))}"></label><button type="button" class="rm" data-i="${i}" aria-label="Quitar ejercicio">×</button></div>`).join("")};
-    const visib=()=>{const t=valGrupo(pn,"tipo");q("#eGym").hidden=t!=="gimnasio";q("#eKmL").hidden=t==="gimnasio";calc()};
+    const visib=()=>{const t=valGrupo(pn,"tipo")||"gimnasio",g=grupoAct(t);q("#eGym").hidden=g!=="fuerza";q("#eKmL").hidden=g!=="dist";q("#eNomL").hidden=t!=="otro";
+      q("#eKmT").textContent=enMetros(t)?"Distancia (metros, opcional)":"Distancia (km, opcional)";q("#eKm").placeholder=enMetros(t)?"Ej: 1500":"Ej: 4,5";calc()};
+    const mas=q("#eMas");if(mas)mas.addEventListener("click",()=>{pn.querySelector('[data-g="tipo"]').classList.add("todas");mas.remove()});
     const calc=()=>{const t=valGrupo(pn,"tipo")||"gimnasio",i=valGrupo(pn,"int")||"media",min=+m.value||0;q("#eQ").textContent=min?`~${fmtN(kcalQ(p,t,i,min))} kcal gastadas en el entreno (estimado${pf.peso?"":", con 70 kg porque no cargaste tu peso"})`:""};
     pintarEjs();visib();
     pn.addEventListener("change",e=>{if(e.target.closest('[data-g="tipo"],[data-g="int"]'))visib()});
@@ -1140,7 +1209,10 @@ function hojaEntreno({f,id,pre}){
       leerEjs();const nf2=q("#eF").value||f;const min=Math.round(+m.value);
       if(!min||min<1){aviso("Poné la duración en minutos.");m.focus();return}
       const tipo=valGrupo(pn,"tipo")||"gimnasio",int=valGrupo(pn,"int")||"media";
-      const e={id:ex?ex.id:uid(),tipo,int,min,desc:q("#eD").value.trim(),km:tipo!=="gimnasio"?(numIn(q("#eKm").value)||""):"",ejercicios:tipo==="gimnasio"?ejs.filter(x=>x.n):[],kcalQ:kcalQ(p,tipo,int,min)};
+      const g=grupoAct(tipo),dist=numIn(q("#eKm").value),nom=q("#eNom").value.trim().slice(0,40);
+      if(tipo==="otro"&&!nom){aviso("Escribí qué actividad hiciste.");q("#eNom").focus();return}
+      const e={id:ex?ex.id:uid(),tipo,int,min,desc:q("#eD").value.trim(),km:g==="dist"&&dist>0?(enMetros(tipo)?Math.round(dist)/1000:dist):"",ejercicios:g==="fuerza"?ejs.filter(x=>x.n):[],kcalQ:kcalQ(p,tipo,int,min)};
+      if(tipo==="otro")e.nombre=nom;
       if(ex&&nf2!==f)cambiarMes(p,f,d=>{d.entrenos[f]=(d.entrenos[f]||[]).filter(x=>x.id!==ex.id)},true);
       cambiarMes(p,nf2,d=>{const a=d.entrenos[nf2]=(d.entrenos[nf2]||[]).filter(x=>x.id!==e.id);a.push(e)});
       cerrar();aviso(ex?"Entreno actualizado":"Entreno guardado. Bien ahí.");

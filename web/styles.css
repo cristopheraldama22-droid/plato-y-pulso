@@ -285,3 +285,14 @@ p.alert{color:var(--warn);font-weight:600}
 textarea.inp{min-height:120px;padding:12px 14px;resize:vertical;line-height:1.45}
 .captcha:empty{display:none}
 .captcha{min-height:65px}
+/* Actividades y progreso */
+.opts.acts{display:flex;flex-wrap:wrap}
+.opts.acts .opt{flex:1 1 auto;min-width:88px}
+.opts.acts .mas{display:none}
+.opts.acts.todas .mas{display:inline-flex}
+.opts.acts .optg{flex-basis:100%;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.opts.acts.todas .optg.mas{display:block}
+h2.sub{margin:18px 0 8px}
+.barra{display:grid;grid-template-columns:minmax(0,9em) 1fr auto;gap:10px;align-items:center;font-size:14px;padding:4px 0}
+.barra .meter{margin-top:0}
+.barra small{color:var(--muted);white-space:nowrap}
