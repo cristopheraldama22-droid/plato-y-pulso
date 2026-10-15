@@ -21,7 +21,8 @@ function barras(serie,campo,etiqueta){
     <div class="eje"><span>${esc(etiqueta(serie[0]||{}))}</span><span>${esc(etiqueta(serie[serie.length-1]||{}))}</span></div>`;
 }
 
-function pintar(d){
+const TIPOS_C={idea:"Idea",problema:"Algo no anda",otro:"Otro"};
+function pintar(d,coms){
   const u=d.usuarios,a=d.activos,c=d.carga,ia=d.ia;
   const kpi=(t,v,sub)=>`<div class="card kpi"><span class="muted">${t}</span><b>${v}</b>${sub?`<span class="muted">${sub}</span>`:""}</div>`;
   const espacios=d.espacios.reduce((m,x)=>{const k=(TIPOS[x.tipo]||x.tipo)+" · "+x.plan;m[k]=(m[k]||0)+x.n;return m},{});
@@ -47,7 +48,8 @@ function pintar(d){
   <div class="card"><h2>Espacios</h2><div class="scroll"><table>
     <tr><th>Nombre</th><th>Tipo</th><th>Plan</th><th>Vence</th><th class="n">Personas</th><th class="n">Comidas 30 d</th><th class="n">IA mes</th><th>Última actividad</th><th>Creado</th></tr>
     ${d.detalle.map(x=>`<tr><td>${esc(x.nombre)}${x.estado!=="activo"?" (suspendido)":""}</td><td>${esc(TIPOS[x.tipo]||x.tipo)}</td><td>${esc(x.plan)}</td><td>${fecha(x.vence)}</td><td class="n">${n(x.personas)}</td><td class="n">${n(x.comidas_30)}</td><td class="n">${usd(x.costo_ia_mes)}</td><td>${fecha(x.ultima)}</td><td>${fecha(x.creado)}</td></tr>`).join("")}
-  </table></div></div>`;
+  </table></div></div>
+  <div class="card" style="margin-top:12px"><h2>Comentarios</h2>${(coms||[]).length?coms.map(c=>`<div class="fila" style="display:block"><span class="muted">${esc(new Date(c.fecha).toLocaleString("es-UY",{dateStyle:"short",timeStyle:"short"}))} · ${esc(TIPOS_C[c.tipo]||c.tipo)} · ${esc(c.email||"")}${c.espacio?" · "+esc(c.espacio):""}${c.pantalla?" · "+esc(c.pantalla):""}</span><div style="white-space:pre-wrap">${esc(c.texto)}</div></div>`).join(""):`<span class="muted">Todavía no hay comentarios.</span>`}</div>`;
   $("#gen").textContent="Actualizado "+new Date(d.generado).toLocaleString("es-UY",{dateStyle:"short",timeStyle:"short"});
 }
 
@@ -66,12 +68,13 @@ function muestra(){
 
 async function cargar(){
   $("#gen").textContent="Cargando…";
-  if(new URLSearchParams(location.search).has("muestra")&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname))return pintar(muestra());
+  if(new URLSearchParams(location.search).has("muestra")&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname))return pintar(muestra(),[{fecha:new Date().toISOString(),tipo:"idea",texto:"Estaría bueno poder repetir la semana pasada.",email:"ana@ejemplo.uy",espacio:"Casa Pérez",pantalla:"semana"}]);
   const {data:s}=await sb.auth.getSession();
   if(!s.session)return aviso(`Entrá primero a la app con tu mail y volvé a esta página.<br><br><a href="./">Ir a la app</a>`);
   const {data,error}=await sb.rpc("panel_uso");
   if(error)return aviso(/sin_permiso/.test(error.message)?"Tu usuario no tiene acceso al panel.":"No se pudo cargar el panel: "+esc(error.message));
-  pintar(data);
+  const c=await sb.rpc("panel_comentarios");
+  pintar(data,c.error?[]:c.data);
 }
 $("#recargar").addEventListener("click",cargar);
 cargar();

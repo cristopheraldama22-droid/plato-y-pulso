@@ -63,6 +63,14 @@ function nube(cfg){
     async estadoIA(e){const d=await rpc("estado_ia",{e});const r=(d&&d[0])||null;return r?{gastado:+r.gastado_usd,tope:+r.tope_usd,foto:!!r.foto,plan:r.plan,activo:!!r.activo,planId:r.plan_id,vence:r.vence||null,iaActiva:r.ia_activa!==false}:null},
     async marcarActividad(){try{await sb.rpc("marcar_actividad")}catch(e){}},
     panelUso:()=>rpc("panel_uso"),
+    async enviarComentario(datos){
+      const {data:s}=await sb.auth.getSession();if(!s.session)throw new ErrorApp("sin_sesion",MSG.sin_sesion);
+      let r;
+      try{r=await fetch(cfg.supabaseUrl.replace(/\/$/,"")+"/functions/v1/comentarios",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.session.access_token,apikey:cfg.supabaseAnonKey},body:JSON.stringify(datos)})}
+      catch(e){throw new ErrorApp("red","Sin conexión. Probá de nuevo cuando tengas señal.")}
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new ErrorApp(j.error||"error",j.mensaje||"No se pudo enviar el comentario.");
+    },
     async usoMes(e){const ini=new Date();ini.setDate(1);ini.setHours(0,0,0,0);const {data,error}=await sb.from("uso_ia").select("tarea,costo_usd,ok").eq("espacio_id",e).gte("creado_en",ini.toISOString());if(error)throw errDe(error);return data},
     async ia(e,tarea,datos,signal){
       const {data:s}=await sb.auth.getSession();if(!s.session)throw new ErrorApp("sin_sesion",MSG.sin_sesion);
@@ -110,6 +118,7 @@ function demo(){
     suscribir(id,cb){const f=(ev)=>{if(ev.key&&ev.key===K+"docs:"+id){const d=JSON.parse(ev.newValue||"{}");Object.entries(d).forEach(([k,v])=>{const [c,i]=k.split("/");cb(c,i,v)})}};window.addEventListener("storage",f);oyentes.add(f);return ()=>window.removeEventListener("storage",f)},
     async estadoIA(){return {gastado:0,tope:0,foto:false,plan:"Demo",activo:true,iaActiva:true}},
     async marcarActividad(){},
+    async enviarComentario(){throw new ErrorApp("demo","En la demo los comentarios no se envían.")},
     async usoMes(){return []},
     async ia(){throw new ErrorApp("tope_plan","La demo no usa IA real.")}
   };

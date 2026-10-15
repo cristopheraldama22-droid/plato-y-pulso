@@ -428,7 +428,7 @@ function render(){
   const sel=$("#selWho");if(sel)sel.onchange=()=>{ui.persona=sel.value;render()};
   $("#tabs").innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-t="${k}" ${ui.tab===k?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>${l}</button>`).join("");
   $("#sync").textContent=!enLinea||pendientes.size?`Sin conexión · ${pendientes.size} sin subir`:B.modo==="demo"?"Demo · en este navegador":AI==="off"?"En la nube · sin IA":"Guardado en la nube";
-  $("#app").innerHTML=VISTAS[ui.tab]()+`<p class="foot">Valores aproximados y orientativos. No reemplazan la consulta con un profesional de la salud.</p>`;
+  $("#app").innerHTML=VISTAS[ui.tab]()+`<div class="feedback"><button class="btn sm" data-a="comentario">Enviar comentario</button><span class="small muted">¿Algo no anda o se te ocurre una mejora? Contanos.</span></div><p class="foot">Valores aproximados y orientativos. No reemplazan la consulta con un profesional de la salud.</p>`;
 }
 const vistaBloqueo=()=>"";
 
@@ -812,6 +812,29 @@ function hojaGastos(){
    ${Object.keys(porMes).length?`<div class="fld"><span>Por mes</span>${Object.entries(porMes).slice(0,6).map(([m,t])=>`<div class="plan"><div class="pt">${esc(MESES[+m.slice(5,7)-1]||m)} ${m.slice(0,4)}</div><b>${fmtPesos(t)}</b></div>`).join("")}</div>`:""}
    <div class="fld"><span>Tickets</span>${g.slice(0,40).map(x=>`<div class="plan"><div class="pt"><small>${esc(fechaCorta(x.fecha))}${x.n?` · ${x.n} productos`:""}</small>${esc(x.comercio||"Ticket")} · ${fmtPesos(x.total,x.moneda)}</div><button class="btn sm warn" data-borrar="${x.id}">Borrar</button></div>`).join("")||`<p class="empty">Todavía no hay tickets.</p>`}</div>`,pn=>{
     pn.querySelectorAll("[data-borrar]").forEach(b=>borrarDoble(b,()=>{cambiarComp("gastos",d=>{d.items=(d.items||[]).filter(x=>x.id!==b.dataset.borrar)});cerrar();hojaGastos()},"¿Seguro?"));
+  });
+}
+/* ---------- Comentarios de quienes prueban la app (van a la base y a una planilla de Google) ---------- */
+function dispositivo(){
+  const ua=navigator.userAgent;
+  const so=/iPhone|iPad|iPod/.test(ua)?"iPhone/iPad":/Android/.test(ua)?"Android":/Windows/.test(ua)?"Windows":/Mac OS X/.test(ua)?"Mac":"Otro";
+  const nav=/Edg\//.test(ua)?"Edge":/SamsungBrowser/.test(ua)?"Samsung":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"otro";
+  const inst=window.matchMedia&&matchMedia("(display-mode: standalone)").matches||navigator.standalone?" · instalada":"";
+  return so+" · "+nav+inst;
+}
+function hojaComentario(){
+  abrir(`<h2>Enviar comentario</h2>
+   <p class="small muted">Lo leemos todo. Si algo no anda, contá qué estabas haciendo.</p>
+   <div class="fld"><span>Es…</span>${opciones("tipo",[["idea","Una idea"],["problema","Algo no anda"],["otro","Otra cosa"]],"idea")}</div>
+   <label class="fld"><span>Tu comentario</span><textarea class="inp" id="fbT" rows="5" maxlength="2000" placeholder="Ej: me gustaría poder…"></textarea></label>
+   <button class="btn pri wide" id="fbOk">Enviar</button>`,pn=>{
+    const q=x=>pn.querySelector(x),t=q("#fbT");setTimeout(()=>t.focus(),60);
+    q("#fbOk").addEventListener("click",async()=>{
+      const texto=t.value.trim();if(!texto){aviso("Escribí tu comentario.");t.focus();return}
+      const b=q("#fbOk");b.disabled=true;b.innerHTML=`<span class="spinner"></span> Enviando…`;
+      try{await B.enviarComentario({tipo:valGrupo(pn,"tipo")||"otro",texto,pantalla:ui.tab,espacio_id:ESP?ESP.espacio_id:null,dispositivo:dispositivo()});cerrar();aviso("¡Gracias! Comentario enviado.")}
+      catch(e){b.disabled=false;b.textContent="Enviar";aviso(e.message||"No se pudo enviar.")}
+    });
   });
 }
 function hojaTicket(){
@@ -1386,6 +1409,7 @@ async function hojaAjustes(){
     <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="cerrarSesion">Cerrar sesión</button></div>
     ${B.modo==="nube"?`<button class="btn" data-x="salirTodos">Cerrar sesión en todos mis dispositivos</button><p class="hint">Usalo si perdiste un celular o entraste en una computadora ajena.</p>`:""}
     ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}
+    <button class="btn" data-x="comentario">Enviar un comentario</button>
     <p class="small"><a href="privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
     ${B.modo==="nube"?`<button class="btn warn" id="ajBorrarCuenta">Eliminar mi cuenta y mis datos</button><p class="hint">Borra tu usuario, tus datos y los espacios donde estás solo. No se puede deshacer: si querés, descargá antes un respaldo.</p>`:""}</section>
    <section class="sec"><h3>Sobre las estimaciones</h3>
@@ -1523,6 +1547,7 @@ const A={
   delCompra:d=>cambiarComp("compras",x=>{x.items=(x.items||[]).filter(z=>z.id!==d.id)}),
   borrarHechos:()=>{cambiarComp("compras",x=>{x.items=(x.items||[]).filter(z=>!z.hecho)});aviso("Comprados borrados de la lista")},
   ticket:()=>hojaTicket(),
+  comentario:()=>hojaComentario(),
   verGastos:()=>hojaGastos(),
   comprasADespensa:()=>{const h=compras().filter(x=>x.hecho);if(!h.length)return;
     cambiarComp("despensa",x=>{x.items=x.items||[];h.forEach(c=>{const ya=x.items.find(y=>norm(y.nombre)===norm(c.nombre));if(ya){if(c.cant)ya.cant=c.cant}else x.items.push({id:uid(),nombre:c.nombre,cant:c.cant||"",cat:c.cat||"otr"})})},true);
