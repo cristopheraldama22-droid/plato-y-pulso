@@ -9,7 +9,7 @@
 
 class ErrorApp extends Error{constructor(codigo,mensaje){super(mensaje||codigo);this.codigo=codigo}}
 const MSG={
-  sin_sesion:"Volvé a iniciar sesión.",codigo_invalido:"Ese código no existe. Revisalo con quien te invitó.",espacio_lleno:"Ese espacio llegó al máximo de personas de su plan.",muchos_intentos:"Demasiados códigos equivocados. Probá de nuevo en una hora.",
+  sin_sesion:"Volvé a iniciar sesión.",codigo_invalido:"Ese código no existe. Revisalo con quien te invitó.",espacio_personal:"Ese espacio es personal: no se puede sumar nadie más.",espacio_lleno:"Ese espacio llegó al máximo de personas de su plan.",muchos_intentos:"Demasiados códigos equivocados. Probá de nuevo en una hora.",
   limite_espacios:"Llegaste al máximo de espacios que podés crear.",sin_permiso:"No tenés permiso para hacer eso.",ultimo_dueno:"El espacio tiene que tener al menos un dueño.",transferir_primero:"Sos el único dueño de un espacio con otras personas. Pasale el rol de dueño a alguien antes de borrar tu cuenta.",
   tope_plan:"Se usó todo el cupo de IA del plan este mes.",plan_sin_foto:"Tu plan no incluye estimar desde fotos.",muchas_llamadas:"Muchas consultas seguidas. Esperá unos minutos.",
   ia_ocupada:"La IA está ocupada. Probá en un rato.",ia_no_disponible:"No se pudo contactar a la IA.",red:"Sin conexión. Se guarda cuando vuelva la señal."
@@ -28,6 +28,7 @@ function nube(cfg){
     async enviarCodigo(email){const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});if(error)throw new ErrorApp("auth",/rate|seconds/i.test(error.message)?"Esperá un minuto antes de pedir otro código.":error.message)},
     async verificarCodigo(email,token){const {error}=await sb.auth.verifyOtp({email,token,type:"email"});if(error)throw new ErrorApp("auth","El código no es correcto o venció. Pedí uno nuevo.")},
     async salir(){await sb.auth.signOut()},
+    async salirTodos(){const {error}=await sb.auth.signOut({scope:"global"});if(error)throw errDe(error)},
     async privacidadAceptada(v){const {count,error}=await sb.from("consentimientos").select("version",{count:"exact",head:true}).eq("version",v);if(error)throw errDe(error);return count>0},
     aceptarPrivacidad:(v)=>rpc("aceptar_privacidad",{p_version:v}),
     async borrarCuenta(){await rpc("borrar_mi_cuenta");try{await sb.auth.signOut({scope:"local"})}catch(e){}},
@@ -88,6 +89,7 @@ function demo(){
     async enviarCodigo(){},
     async verificarCodigo(email){set("yo",{email,id:uid()})},
     async salir(){localStorage.removeItem(K+"yo")},
+    async salirTodos(){localStorage.removeItem(K+"yo")},
     async privacidadAceptada(){return true},
     async aceptarPrivacidad(){},
     async borrarCuenta(){Object.keys(localStorage).filter(k=>k.startsWith(K)).forEach(k=>localStorage.removeItem(k))},

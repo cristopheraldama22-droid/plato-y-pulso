@@ -433,7 +433,7 @@ const vistaBloqueo=()=>"";
 /* =========================================================
    Entrada: iniciar sesión y elegir espacio
    ========================================================= */
-const TIPOS_ESP=[["hogar","Hogar"],["gimnasio","Gimnasio"],["entrenador","Entrenador"],["nutricionista","Nutricionista"]];
+const TIPOS_ESP=[["hogar","Hogar"],["personal","Personal"]];
 const entrada={email:lsGet("pp:email")||"",paso:"email",ocupado:false,error:""};
 function renderEntrada(){
   document.body.classList.add("entrada");
@@ -458,7 +458,7 @@ function renderEntrada(){
     h=`<section class="sec"><p class="eyebrow">${esc(SESION?SESION.email:"")}</p><h1>Antes de empezar</h1>
       <p class="muted">${esc(nombreApp())} guarda datos de salud: lo que comés, tu peso y medidas, y tus entrenamientos. Por eso necesitamos tu consentimiento expreso.</p></section>
     <section class="card sec">
-      <p class="small">Resumen: tus datos se usan solo para que la app funcione. Los ven las personas de tus espacios según cómo esté configurado cada uno (en un hogar, todos; en un grupo profesional, vos y quienes son profesionales). Para estimar comidas y armar recetas, el texto o la foto se envía a un servicio de IA. No vendemos tus datos. Podés borrar tu cuenta y todos tus datos cuando quieras desde Ajustes.</p>
+      <p class="small">Resumen: tus datos se usan solo para que la app funcione. Los ven las personas de tus espacios según cómo esté configurado cada uno (en un hogar, todas las personas del hogar; en un espacio personal, solo vos). Para estimar comidas y armar recetas, el texto o la foto se envía a un servicio de IA. No vendemos tus datos. Podés borrar tu cuenta y todos tus datos cuando quieras desde Ajustes.</p>
       <p class="small"><a href="privacidad" target="_blank" rel="noopener">Leer la política de privacidad completa</a></p>
       <label class="chk"><input type="checkbox" id="pvA"> Leí y acepto la política de privacidad.</label>
       <label class="chk"><input type="checkbox" id="pvB"> Doy mi consentimiento expreso para que se traten mis datos de salud con estos fines.</label>
@@ -476,7 +476,7 @@ function renderEntrada(){
       <label class="fld"><span>Nombre</span><input class="inp" id="nNom" placeholder="Ej: Casa Aldama"></label>
       <div class="fld"><span>Tipo</span><div class="opts" data-g="tipoEsp">${TIPOS_ESP.map(([v,l],i)=>`<button type="button" class="opt" data-v="${v}" aria-pressed="${i===0}">${l}</button>`).join("")}</div></div>
       <label class="fld"><span>Tu nombre</span><input class="inp" id="nYo" autocomplete="given-name"></label>
-      <p class="hint">En un hogar todos ven y anotan a todos. En un gimnasio o consultorio, cada persona ve solo lo suyo y quienes son profesionales ven a todos.</p>
+      <p class="hint">Hogar: varias personas comparten el espacio y todas ven y anotan los datos de todas. Personal: es solo para vos y nadie más se puede sumar.</p>
       <button class="btn pri" data-a="crearEsp">Crear</button></section>
     <button class="link" data-a="salir">Cerrar sesión</button>
     ${entrada.error?`<p class="alert small">${esc(entrada.error)}</p>`:""}`;
@@ -1190,10 +1190,10 @@ async function hojaAjustes(){
   const marca=ESP.marca||{};
   abrir(`<h2>Ajustes</h2>
    <section class="sec"><h3>${esc(ESP.nombre)}</h3>
-    <p class="small muted">${esc(tipoN)} · ${dueno?"sos dueño":rol==="profesional"?"sos profesional":"sos miembro"}${ESP.datos_compartidos?" · los datos se comparten entre todos":" · cada persona ve solo lo suyo; los profesionales ven a todos"}</p>
+    <p class="small muted">${esc(tipoN)} · ${dueno?"sos dueño":rol==="profesional"?"sos profesional":"sos miembro"}${ESP.tipo==="personal"?" · solo para vos":ESP.datos_compartidos?" · los datos se comparten entre todos":" · cada persona ve solo lo suyo"}</p>
     <div id="ajIA" class="card sec"><span class="small muted">Cargando el consumo de IA…</span></div>
    </section>
-   ${prof?`<section class="sec"><h3>Invitar personas</h3><p class="hint">Pasales este código (o el link). Entran con su mail y quedan como miembros.</p><div class="card sec" id="ajCod"><span class="small muted">Cargando…</span></div></section>`:""}
+   ${prof&&ESP.tipo!=="personal"?`<section class="sec"><h3>Invitar personas</h3><p class="hint">Pasales este código (o el link). Entran con su mail y quedan como miembros.</p><div class="card sec" id="ajCod"><span class="small muted">Cargando…</span></div></section>`:""}
    <section class="sec"><h3>Personas</h3><div class="pantry" id="ajMiem"></div></section>
    ${dueno?`<section class="sec"><h3>Marca de la app</h3><p class="hint">Para gimnasios, entrenadores o consultorios: la app muestra su nombre y su color.</p>
      <div class="two"><label class="fld"><span>Nombre de la app</span><input class="inp" id="mkN" maxlength="40" value="${esc(marca.nombre_app||"")}" placeholder="Plato y Pulso"></label>
@@ -1212,6 +1212,7 @@ async function hojaAjustes(){
    </section>
    <section class="sec"><h3>Cuenta</h3><p class="small muted">${esc(SESION?SESION.email:"")}</p>
     <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="salir">Cerrar sesión</button></div>
+    ${B.modo==="nube"?`<button class="btn" data-x="salirTodos">Cerrar sesión en todos mis dispositivos</button><p class="hint">Usalo si perdiste un celular o entraste en una computadora ajena.</p>`:""}
     ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}
     <p class="small"><a href="privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
     ${B.modo==="nube"?`<button class="btn warn" id="ajBorrarCuenta">Eliminar mi cuenta y mis datos</button><p class="hint">Borra tu usuario, tus datos y los espacios donde estás solo. No se puede deshacer: si querés, descargá antes un respaldo.</p>`:""}</section>
@@ -1230,14 +1231,14 @@ async function hojaAjustes(){
       box.innerHTML=st?`<div class="legend"><b>IA de este mes · plan ${esc(st.plan)}</b><span class="small muted">${st.tope>0?`${Math.min(100,Math.round(st.gastado/st.tope*100))}% del cupo`:"sin IA"}</span></div>${st.tope>0?`<div class="meter" style="color:var(--accent)"><i style="width:${Math.min(100,st.gastado/st.tope*100)}%"></i></div>`:""}${dueno&&st.tope>0?`<span class="small muted">US$ ${st.gastado.toFixed(3)} de US$ ${st.tope.toFixed(2)}${st.foto?"":" · el plan no incluye fotos"}</span>`:""}${det}`:`<span class="small muted">Sin datos de IA.</span>`;
     }catch(e){if(box.isConnected)box.innerHTML=`<span class="small muted">No pude leer el consumo de IA.</span>`}})();
     /* código de invitación */
-    if(prof)(async()=>{const box=q("#ajCod");try{const c=await B.codigo(ESP.espacio_id);const link=location.origin+location.pathname+"?codigo="+encodeURIComponent(c||"");
+    if(prof&&ESP.tipo!=="personal")(async()=>{const box=q("#ajCod");try{const c=await B.codigo(ESP.espacio_id);const link=location.origin+location.pathname+"?codigo="+encodeURIComponent(c||"");
       if(!box.isConnected)return;
       box.innerHTML=`<div class="refrow"><span class="num" style="font-size:30px;letter-spacing:.06em">${esc(c||"—")}</span></div><p class="small muted" style="overflow-wrap:anywhere">${esc(link)}</p><div class="row"><button class="btn sm" id="cpCod">Copiar link</button>${dueno?`<button class="btn sm" id="rgCod">Cambiar código</button>`:""}</div>`;
       q("#cpCod").addEventListener("click",()=>{try{navigator.clipboard.writeText(link).then(()=>aviso("Link copiado"),()=>hojaTexto("Link de invitación",link,"Copiá este link y mandalo por WhatsApp."))}catch(e){hojaTexto("Link de invitación",link,"Copiá este link y mandalo por WhatsApp.")}});
       const rg=q("#rgCod");if(rg)borrarDoble(rg,async()=>{try{await B.regenerarCodigo(ESP.espacio_id);aviso("Código cambiado: el anterior ya no sirve");cerrar();hojaAjustes()}catch(e){aviso(e.message)}},"Tocá de nuevo: el código viejo deja de servir");
     }catch(e){if(box.isConnected)box.innerHTML=`<span class="small muted">No pude leer el código.</span>`}})();
     /* miembros */
-    const pintarMiem=()=>{q("#ajMiem").innerHTML=MIEMBROS.map(m=>`<div class="pitem"><span><b>${esc(m.nombre)}</b>${m.id===YO?" (vos)":""}<small style="display:block">${m.rol==="dueno"?"Dueño":m.rol==="profesional"?"Profesional":"Miembro"}</small></span>${dueno&&m.id!==YO?`<span class="row tight"><select class="inp" data-rol="${m.id}" aria-label="Rol de ${esc(m.nombre)}" style="min-height:40px;width:auto">${[["miembro","Miembro"],["profesional","Profesional"],["dueno","Dueño"]].map(([v,l])=>`<option value="${v}" ${m.rol===v?"selected":""}>${l}</option>`).join("")}</select><button class="btn sm warn" data-quitar="${m.id}">Quitar</button></span>`:""}</div>`).join("")||`<p class="empty">Solo vos por ahora.</p>`;
+    const pintarMiem=()=>{q("#ajMiem").innerHTML=MIEMBROS.map(m=>`<div class="pitem"><span><b>${esc(m.nombre)}</b>${m.id===YO?" (vos)":""}<small style="display:block">${m.rol==="dueno"?"Dueño":m.rol==="profesional"?"Profesional":"Miembro"}</small></span>${dueno&&m.id!==YO?`<span class="row tight"><select class="inp" data-rol="${m.id}" aria-label="Rol de ${esc(m.nombre)}" style="min-height:40px;width:auto">${[["miembro","Miembro"],["dueno","Dueño"]].map(([v,l])=>`<option value="${v}" ${m.rol===v?"selected":""}>${l}</option>`).join("")}</select><button class="btn sm warn" data-quitar="${m.id}">Quitar</button></span>`:""}</div>`).join("")||`<p class="empty">Solo vos por ahora.</p>`;
       pn.querySelectorAll("[data-rol]").forEach(sl=>sl.addEventListener("change",async()=>{try{await B.cambiarRol(sl.dataset.rol,sl.value);await cargarMiembros();aviso("Rol actualizado");pintarMiem()}catch(e){aviso(e.message)}}));
       pn.querySelectorAll("[data-quitar]").forEach(b=>borrarDoble(b,async()=>{try{await B.quitarMiembro(b.dataset.quitar);await cargarMiembros();aviso("Persona quitada del espacio");pintarMiem();render()}catch(e){aviso(e.message)}},"¿Seguro? Tocá de nuevo"));};
     pintarMiem();
@@ -1294,6 +1295,7 @@ const A={
     if(!$("#pvA").checked||!$("#pvB").checked){entrada.error="Para usar la app tenés que marcar las dos casillas.";render();return}
     entrada.ocupado=true;entrada.error="";render();
     try{await B.aceptarPrivacidad(PRIV_V);entrada.ocupado=false;await alEntrar()}catch(e){entrada.ocupado=false;entrada.error=e.message;render()}},
+  salirTodos:async()=>{saliendo=true;try{await B.salirTodos()}catch(e){aviso(e.message)}await A.salir();aviso("Se cerró la sesión en todos tus dispositivos")},
   salir:async()=>{saliendo=true;try{await B.salir()}catch(e){}saliendo=false;if(desuscribir){desuscribir();desuscribir=null}SESION=null;ESP=null;YO=null;ETAPA="login";entrada.paso="email";aplicarMarca();render()},
   objetivo:d=>cambiarPerfil(ui.persona,x=>{x.objetivo=d.o}),
   perfil:()=>hojaPerfil(),

@@ -58,7 +58,19 @@ end $$;
 
 -- ---------- Gimnasio: profe crea; dos socios se unen ----------
 select set_config('request.jwt.claim.sub', :'profe', false);
-insert into r select 'gym', public.crear_espacio('Gimnasio Punto','gimnasio','Profe')::text;
+-- Los tipos profesionales ya no se crean desde la app; se simula un espacio viejo
+-- de ese tipo (datos no compartidos) para seguir probando el aislamiento.
+do $ begin
+  perform public.crear_espacio('Gimnasio Punto','gimnasio','Profe');
+  raise exception 'FALLO: se pudo crear un gimnasio';
+exception when others then
+  if sqlerrm = 'tipo_invalido' then raise notice 'OK: ya no se crean espacios de tipo gimnasio'; else raise; end if;
+end $;
+insert into r select 'gym', public.crear_espacio('Gimnasio Punto','hogar','Profe')::text;
+reset role;
+update public.espacios set tipo = 'gimnasio', datos_compartidos = false where id = (select v from r where k='gym')::uuid;
+set role authenticated;
+select set_config('request.jwt.claim.sub', :'profe', false);
 insert into r select 'codigo_gym', public.codigo_de((select v from r where k='gym')::uuid);
 
 select set_config('request.jwt.claim.sub', :'socio1', false);
@@ -95,8 +107,14 @@ select set_config('request.jwt.claim.sub', :'profe', false);
 select count(*) as docs_que_ve_el_profe from public.docs where espacio_id = (select v from r where k='gym')::uuid;
 \echo '-- El profe no ve nada del hogar de Cris (esperado 0):'
 select count(*) from public.docs where espacio_id = (select v from r where k='hogar')::uuid;
-\echo '-- El profe asciende al socio 1 a profesional:'
-select public.cambiar_rol((select v from r where k='m_s1')::uuid,'profesional');
+\do $ begin
+  perform public.cambiar_rol((select v from r where k='m_s1')::uuid,'profesional');
+  raise exception 'FALLO: se asignó el rol profesional';
+exception when others then
+  if sqlerrm = 'rol_invalido' then raise notice 'OK: el rol profesional ya no se asigna'; else raise; end if;
+end $;
+echo '-- El profe hace dueño al socio 1:'
+select public.cambiar_rol((select v from r where k='m_s1')::uuid,'dueno');
 select rol from public.miembros where id = (select v from r where k='m_s1')::uuid;
 
 -- ---------- Alguien de afuera ----------
@@ -126,7 +144,7 @@ do $$ begin
   exception when insufficient_privilege then raise notice 'OK: no se puede cambiar datos_compartidos';
   end;
 end $$;
--- Quitado y de vuelta: entra como miembro, no con su rol anterior (socio 1 era profesional)
+-- Quitado y de vuelta: entra como miembro, no con su rol anterior (socio 1 era dueño)
 select public.quitar_miembro((select v from r where k='m_s1')::uuid);
 \echo '-- Al quitar a alguien cambia el código (esperado true):'
 select public.codigo_de((select v from r where k='gym')::uuid) <> (select v from r where k='codigo_gym') as codigo_nuevo;
@@ -181,4 +199,17 @@ select count(*) from public.docs where espacio_id = (select v from r where k='ho
 reset role;
 \echo '-- Vista de administrador:'
 select nombre, plan_id, miembros_activos, costo_ia_mes_usd from public.admin_resumen order by nombre;
-\echo 'TODAS LAS PRUEBAS TERMINARON'
+\-- ---------- Espacio personal: nadie más se suma ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', :'extra', false);
+insert into r select 'personal', public.crear_espacio('Lo mío','personal','Extra')::text;
+insert into r select 'codigo_personal', public.codigo_de((select v from r where k='personal')::uuid);
+select set_config('request.jwt.claim.sub', :'socio2', false);
+do $ begin
+  perform public.unirse_con_codigo((select v from r where k='codigo_personal'),'Intruso');
+  raise exception 'FALLO: alguien se sumó a un espacio personal';
+exception when others then
+  if sqlerrm = 'espacio_personal' then raise notice 'OK: nadie se suma a un espacio personal'; else raise; end if;
+end $;
+reset role;
+echo 'TODAS LAS PRUEBAS TERMINARON'
