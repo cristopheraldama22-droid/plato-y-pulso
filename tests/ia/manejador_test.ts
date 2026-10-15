@@ -131,6 +131,34 @@ Deno.test("lote y compra: interpreta arrays y categorías", async () => {
   assertEquals((await manejar(pedir({ espacio_id: ESP, tarea: "compra", datos: { rutinas: [] } }), d3)).status, 400);
 });
 
+Deno.test("ticket: arma el pedido con varias fotos y limpia la respuesta", async () => {
+  const p = armarPedido("ticket", { imagenes: [{ imagen: "QUJD".repeat(100), media_type: "image/jpeg" }, { imagen: "QUJD".repeat(100) }] });
+  assertEquals(p.contenido.filter((c) => (c as { type: string }).type === "image").length, 2);
+  assertEquals(p.modelo, "claude-haiku-5-5");
+  const respuesta = JSON.stringify({ comercio: "Super X", fecha: "2026-10-19", total: "1.234,5", items: [
+    { nombre: "Pechuga de pollo", cant: "1 kg", precio: 289.5, cat: "prot", comida: true },
+    { nombre: "Detergente", precio: 120, cat: "raro", comida: false },
+    { nombre: "", precio: 10 },
+  ] });
+  const { d } = deps({ respuesta });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "ticket", datos: { imagenes: [{ imagen: "QUJD".repeat(100) }] } }), d);
+  assertEquals(r.status, 200);
+  const j = (await r.json()).resultado;
+  assertEquals(j.items.length, 2);
+  assertEquals(j.items[1], { nombre: "Detergente", cant: "", precio: 120, cat: "otr", comida: false });
+  assertEquals(j.fecha, "2026-10-19");
+  assertEquals(j.legible, true);
+});
+
+Deno.test("ticket: el plan sin fotos no lo permite y valida las imágenes", async () => {
+  const { d, pedidos } = deps({ estado: async () => ({ gastado: 0, tope: 3, foto: false, activo: true }) });
+  const r = await manejar(pedir({ espacio_id: ESP, tarea: "ticket", datos: { imagenes: [{ imagen: "QUJD".repeat(100) }] } }), d);
+  assertEquals((await r.json()).error, "plan_sin_foto"); assertEquals(pedidos.length, 0);
+  let error = "";
+  try { armarPedido("ticket", { imagenes: [] }); } catch (e) { error = (e as { codigo: string }).codigo; }
+  assertEquals(error, "imagen_invalida");
+});
+
 Deno.test("extraerJSON tolera texto alrededor", () => {
   assertEquals(extraerJSON('Claro: {"a":1} listo'), { a: 1 });
 });

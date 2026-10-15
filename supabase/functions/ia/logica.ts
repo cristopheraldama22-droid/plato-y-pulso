@@ -2,8 +2,8 @@
 // respuestas y calcula el costo. No toca la red ni la base de datos, así se
 // puede probar sola (ver tests/ia).
 
-export type Tarea = "estimar" | "estimar_lote" | "foto" | "recetas" | "compra";
-export const TAREAS: Tarea[] = ["estimar", "estimar_lote", "foto", "recetas", "compra"];
+export type Tarea = "estimar" | "estimar_lote" | "foto" | "recetas" | "compra" | "ticket";
+export const TAREAS: Tarea[] = ["estimar", "estimar_lote", "foto", "recetas", "compra", "ticket"];
 
 export interface Config {
   modeloRapido: string;   // estimaciones, fotos, lista de compras
@@ -83,6 +83,29 @@ ${FORMATO_EST}`),
 ${items.map((v, i) => `${i}. ${q(v.texto)}${v.cant ? ` (cantidad: ${q(v.cant)})` : ""}`).join("\n")}
 Respondé solo con un array JSON con un objeto por comida, en el mismo orden: [{"i":0,"kcal":520,"prot":38,"veg":1.5,"ultra":false}]
 ${FORMATO_EST}`),
+      };
+    }
+    case "ticket": {
+      const imgs = lista<Record<string, unknown>>(datos.imagenes, 3)
+        .map((x) => ({ img: String(x?.imagen ?? ""), tipo: String(x?.media_type ?? "image/jpeg") }));
+      if (!imgs.length) throw new ErrorPedido("imagen_invalida", "Falta la foto del ticket.");
+      let total = 0;
+      for (const { img, tipo } of imgs) {
+        if (!/^image\/(jpeg|png|webp)$/.test(tipo)) throw new ErrorPedido("imagen_invalida", "Formato de imagen no admitido.");
+        if (!/^[A-Za-z0-9+/=]+$/.test(img) || img.length < 200) throw new ErrorPedido("imagen_invalida", "La imagen no llegó bien.");
+        total += img.length;
+      }
+      if (total > 4_500_000) throw new ErrorPedido("imagen_grande", "Las fotos son demasiado grandes.", 413);
+      return {
+        modelo: cfg.modeloRapido, maxTokens: 3000,
+        contenido: [
+          ...imgs.map(({ img, tipo }) => ({ type: "image", source: { type: "base64", media_type: tipo, data: img } })),
+          { type: "text", text: `${imgs.length > 1 ? "Son fotos de partes del mismo ticket de supermercado de Uruguay, en orden." : "Es la foto de un ticket de supermercado de Uruguay."} Leé cada producto comprado.
+Para cada producto: "nombre" claro en español de Uruguay, sin marca salvo que haga falta, expandiendo las abreviaturas del ticket (por ejemplo "PECH POLLO" es "Pechuga de pollo", "LECHE ENT" es "Leche entera"); "cant" con la cantidad o el peso si aparece ("1 kg", "2 u", "500 g"), si no, vacío; "precio" = importe final de esa línea como número; "cat" una de: prot (carnes, huevos, pescado), ver (verduras y frutas), lac (lácteos), alm (almacén), otr (otros); "comida" = true si es comida o bebida, false si es limpieza, higiene u otra cosa.
+Ignorá descuentos sueltos, subtotales, medios de pago, números de tarjeta, RUT y cualquier dato personal: no los incluyas en la respuesta.
+Respondé solo con JSON: {"comercio":"nombre del super","fecha":"AAAA-MM-DD o vacío","total":1234.5,"moneda":"UYU","items":[{"nombre":"Pechuga de pollo","cant":"1 kg","precio":289.5,"cat":"prot","comida":true}]}
+Si la imagen no es un ticket o no se puede leer, respondé {"items":[],"legible":false}.` },
+        ],
       };
     }
     case "foto": {
@@ -217,6 +240,27 @@ export function interpretar(tarea: Tarea, crudo: unknown): unknown {
       }));
       if (lista5.length < 3) throw new ErrorPedido("respuesta_invalida", "La IA no devolvió recetas completas.", 502);
       return lista5;
+    }
+    case "ticket": {
+      const o = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
+      const items = (Array.isArray(o.items) ? o.items : []).slice(0, 80).map((x: Record<string, unknown>) => {
+        const p = num(x?.precio);
+        return {
+          nombre: limpiar(x?.nombre, 60), cant: limpiar(x?.cant, 30),
+          precio: p !== null && p >= 0 && p < 1e6 ? Math.round(p * 100) / 100 : null,
+          cat: CATS.includes(String(x?.cat)) ? String(x?.cat) : "otr",
+          comida: x?.comida !== false && x?.comida !== "false",
+        };
+      }).filter((x: { nombre: string }) => x.nombre);
+      const t = num(o.total), f = String(o.fecha ?? "");
+      return {
+        comercio: limpiar(o.comercio, 60),
+        fecha: /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : "",
+        total: t !== null && t >= 0 && t < 1e7 ? Math.round(t * 100) / 100 : null,
+        moneda: o.moneda === "USD" ? "USD" : "UYU",
+        items,
+        legible: o.legible !== false && items.length > 0,
+      };
     }
     case "compra":
       return arr(crudo).filter((x) => x && x.nombre).slice(0, 60).map((x) => ({

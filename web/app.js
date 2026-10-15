@@ -132,6 +132,7 @@ const extrasDe=(p,f)=>((mesDoc(p,f).extras||{})[f])||{};
 const despensa=()=>(S.comp.despensa&&S.comp.despensa.items)||[];
 const platos=()=>(S.comp.platos&&S.comp.platos.items)||[];
 const compras=()=>(S.comp.compras&&S.comp.compras.items)||[];
+const gastos=()=>(S.comp.gastos&&S.comp.gastos.items)||[];
 const recetasDoc=()=>S.comp.recetas||{};
 const favoritas=()=>recetasDoc().favoritas||[];
 const catalogo=()=>(S.comp.catalogo&&S.comp.catalogo.items)||{};
@@ -287,12 +288,12 @@ async function estimar(texto,cant){
   return estimarLocal(texto,cant);
 }
 /* Achica la foto en el celular (≈1,2 megapíxeles, JPEG) para que suba rápido y cueste menos. */
-async function fotoABase64(file){
+async function fotoABase64(file,px=1200000,calidad=.82){
   const img=await new Promise((ok,mal)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);mal(new PPBackend.ErrorApp("imagen_invalida","No pude leer esa imagen. Probá con otra foto."))};i.src=u});
-  const esc_=Math.min(1,Math.sqrt(1200000/(img.naturalWidth*img.naturalHeight||1)));
+  const esc_=Math.min(1,Math.sqrt(px/(img.naturalWidth*img.naturalHeight||1)));
   const w=Math.max(1,Math.round(img.naturalWidth*esc_)),h=Math.max(1,Math.round(img.naturalHeight*esc_));
   const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
-  return cv.toDataURL("image/jpeg",0.82).split(",")[1];
+  return cv.toDataURL("image/jpeg",calidad).split(",")[1];
 }
 async function estimarFoto(file){
   const imagen=await fotoABase64(file);
@@ -560,9 +561,9 @@ const nombreSemana=lun=>{const l0=lunesDe(hoyStr());return lun===l0?"Esta semana
 function ponerEnMenu(lun,dia,slot,item){cambiarMenu(lun,sem=>{sem[dia]=sem[dia]||{};sem[dia][slot]=item})}
 function marcarComido(lun,dia,slot){cambiarMenu(lun,sem=>{const it=(sem[dia]||{})[slot];if(it)it.hecho=true})}
 function comerDelMenu(lun,dia,slot){
-  const it=itemMenu(lun,dia,slot);if(!it)return;const fin=()=>marcarComido(lun,dia,slot);
-  if(it.tipo==="texto")hojaComida({f:hoyStr(),slot,pre:{texto:it.titulo},alGuardar:fin});
-  else hojaCocinamos(it,{slot,alGuardar:fin});
+  const it=itemMenu(lun,dia,slot),f=fechaDe(lun,dia);if(!it||f>hoyStr())return;const fin=()=>marcarComido(lun,dia,slot);
+  if(it.tipo==="texto")hojaComida({f,slot,pre:{texto:it.titulo},alGuardar:fin});
+  else hojaCocinamos(it,{slot,f,alGuardar:fin});
 }
 function bloqueMenuHoy(lun,dk,slots){
   return `<section class="sec"><div class="sec-h"><h2>Hoy en el menú</h2><button class="link" data-a="tab" data-t="semana">Ver semana</button></div><div class="card">${slots.map(([k,l])=>{const it=itemMenu(lun,dk,k);
@@ -616,26 +617,25 @@ function compraDelMenu(lun){
   aviso((n?`${n} ${n===1?"ingrediente sumado":"ingredientes sumados"} a la compra`:items.length?"Ya estaba todo en la lista":"No hay ingredientes nuevos para comprar")+(sinReceta?` · ${sinReceta} ${sinReceta===1?"comida no tiene":"comidas no tienen"} receta`:""));
 }
 VISTAS.semana=function(){
-  const hoy=hoyStr(),lun=ui.semana||lunesDe(hoy),sem=semanaMenu(lun);
+  const hoy=hoyStr(),lun=ui.semMenu||lunesDe(hoy),sem=semanaMenu(lun);
   const slots=MENU_SLOTS.filter(([k])=>ui.menuTodo||k==="almuerzo"||k==="cena"||DIAS.some(d=>(sem[d]||{})[k]));
   const n=DIAS.reduce((a,d)=>a+Object.keys(sem[d]||{}).length,0);
   const btn=(a,lun,dia,k,txt,cls,lab)=>`<button class="btn sm${cls?" "+cls:""}" data-a="${a}" data-l="${lun}" data-d="${dia}" data-s="${k}"${lab?` aria-label="${lab}"`:""}>${txt}</button>`;
   return `<section class="sec">
     <p class="eyebrow">${COMPARTE()&&PERS.length>1?"Menú de la casa":"Tu menú"}</p>
-    <div class="datenav"><button class="arrow" data-a="semNav" data-d="-7" aria-label="Semana anterior">‹</button>
+    <div class="datenav"><button class="arrow" data-a="semNav" data-d="-7" aria-label="Semana anterior" ${lun<=addDays(lunesDe(hoy),-28)?"disabled":""}>‹</button>
       <div class="dl"><b>${nombreSemana(lun)}</b><span class="small muted">${fechaCorta(lun)} al ${fechaCorta(addDays(lun,6))}</span></div>
       <button class="arrow" data-a="semNav" data-d="7" aria-label="Semana siguiente">›</button></div>
     <div class="row">${n?`<button class="btn pri" data-a="semCompra">Armar la compra</button>`:""}<button class="btn" data-a="semTodo">${ui.menuTodo?"Solo almuerzo y cena":"+ Desayuno y merienda"}</button></div>
-    <p class="hint">${n?`${n} ${n===1?"comida planificada":"comidas planificadas"}. "Armar la compra" suma los ingredientes de las recetas que no están en la despensa.`:"Planificá qué van a comer cada día. Con recetas, la lista de compras se arma sola."}</p>
+    <p class="hint">${n?`${n} ${n===1?"comida planificada":"comidas planificadas"}. "Armar la compra" suma los ingredientes de las recetas que no están en la despensa.`:lun<lunesDe(hoy)?"¿Te olvidaste de anotar algo? Cargá lo que comieron y tocá \"La comimos\": se anota en ese día.":"Planificá qué van a comer cada día. Con recetas, la lista de compras se arma sola."}</p>
   </section>
   ${DIAS.map(dia=>{const f=fechaDe(lun,dia),esHoy=f===hoy,pasado=f<hoy,dd=sem[dia]||{};
     const llenos=slots.filter(([k])=>dd[k]),vacios=slots.filter(([k])=>!dd[k]);
     return `<section class="card sec menu-dia${esHoy?" hoy":""}${pasado?" pasado":""}">
       <div class="sec-h"><h3>${DIAS_L[dia]} <span class="small muted">${fechaCorta(f)}</span></h3>${esHoy?`<span class="pill">Hoy</span>`:""}</div>
       ${llenos.map(([k,l])=>{const it=dd[k];return `<div class="plan"><div class="pt"><small>${l}${it.kcal?` · ~${fmtN(it.kcal)} kcal`:""}${it.hecho?" · anotada":""}</small>${esc(it.titulo)}</div>
-        <div class="row tight">${it.tipo==="receta"?btn("menuVer",lun,dia,k,"Receta"):""}${esHoy&&!it.hecho?btn("menuComer",lun,dia,k,"La comimos","pri"):""}${pasado?"":btn("menuEditar",lun,dia,k,"Cambiar","",`Cambiar ${l.toLowerCase()} del ${DIAS_L[dia].toLowerCase()}`)}</div></div>`}).join("")}
-      ${vacios.length&&!pasado?`<div class="chips">${vacios.map(([k,l])=>`<button class="chip add" data-a="menuEditar" data-l="${lun}" data-d="${dia}" data-s="${k}">${l}</button>`).join("")}</div>`:""}
-      ${!llenos.length&&pasado?`<p class="small muted">Sin menú.</p>`:""}
+        <div class="row tight">${it.tipo==="receta"?btn("menuVer",lun,dia,k,"Receta"):""}${(esHoy||pasado)&&!it.hecho?btn("menuComer",lun,dia,k,"La comimos","pri"):""}${btn("menuEditar",lun,dia,k,"Cambiar","",`Cambiar ${l.toLowerCase()} del ${DIAS_L[dia].toLowerCase()}`)}</div></div>`}).join("")}
+      ${vacios.length?`<div class="chips">${vacios.map(([k,l])=>`<button class="chip add" data-a="menuEditar" data-l="${lun}" data-d="${dia}" data-s="${k}">${l}</button>`).join("")}</div>`:""}
     </section>`}).join("")}`;
 };
 
@@ -796,11 +796,79 @@ function vistaRecetas(){
   </section>
   ${act.length?`<section class="sec">${rd.fecha?`<p class="eyebrow">Generadas ${rd.fecha===hoyStr()?"hoy":"el "+fechaCorta(rd.fecha)}${rd.fuente==="base"?" · base fija":""}</p>`:""}${act.map((r,i)=>tarjetaReceta(r,i,"act")).join("")}</section>`:`<p class="empty">Cargá algunos ingredientes en la despensa y tocá "Generar 5 recetas". Podés pedir rápidas, para llevar, de horno o contar un antojo.</p>`}`;
 }
+/* ---------- Ticket del súper: la IA lee la foto, se revisa y se guarda en despensa, compras y gastos ----------
+   La foto no se guarda: se manda a la IA y se descarta. Solo quedan los productos elegidos y el total. */
+const fmtPesos=(v,m)=>(m==="USD"?"US$ ":"$ ")+(+v||0).toLocaleString("es-UY",{maximumFractionDigits:0});
+function resumenGasto(){
+  const mes=hoyStr().slice(0,7),g=gastos().filter(x=>String(x.fecha||"").startsWith(mes)&&x.moneda!=="USD");
+  if(!g.length)return "";
+  const t=g.reduce((a,x)=>a+(+x.total||0),0);
+  return `<div class="card plan"><div class="pt"><small>Súper este mes</small>${fmtPesos(t)} · ${g.length} ${g.length===1?"ticket":"tickets"}</div><button class="btn sm" data-a="verGastos">Ver</button></div>`;
+}
+function hojaGastos(){
+  const g=[...gastos()].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  const porMes={};g.forEach(x=>{if(x.moneda==="USD")return;const m=String(x.fecha||"").slice(0,7);porMes[m]=(porMes[m]||0)+(+x.total||0)});
+  abrir(`<h2>Gasto en súper</h2>
+   ${Object.keys(porMes).length?`<div class="fld"><span>Por mes</span>${Object.entries(porMes).slice(0,6).map(([m,t])=>`<div class="plan"><div class="pt">${esc(MESES[+m.slice(5,7)-1]||m)} ${m.slice(0,4)}</div><b>${fmtPesos(t)}</b></div>`).join("")}</div>`:""}
+   <div class="fld"><span>Tickets</span>${g.slice(0,40).map(x=>`<div class="plan"><div class="pt"><small>${esc(fechaCorta(x.fecha))}${x.n?` · ${x.n} productos`:""}</small>${esc(x.comercio||"Ticket")} · ${fmtPesos(x.total,x.moneda)}</div><button class="btn sm warn" data-borrar="${x.id}">Borrar</button></div>`).join("")||`<p class="empty">Todavía no hay tickets.</p>`}</div>`,pn=>{
+    pn.querySelectorAll("[data-borrar]").forEach(b=>borrarDoble(b,()=>{cambiarComp("gastos",d=>{d.items=(d.items||[]).filter(x=>x.id!==b.dataset.borrar)});cerrar();hojaGastos()},"¿Seguro?"));
+  });
+}
+function hojaTicket(){
+  let fotos=[];
+  const pintar=()=>abrir(`<h2>Cargar ticket</h2>
+   <p class="small muted">Sacale una foto al ticket del súper. Si es largo, sacá hasta 3 fotos en orden. La foto no se guarda: solo los productos que elijas.</p>
+   <label class="btn photo wide">${fotos.length?"Agregar otra foto":"Sacar o elegir foto"}<input type="file" id="tkF" accept="image/*" ${fotos.length?"":"multiple"} aria-label="Foto del ticket"></label>
+   ${fotos.length?`<p class="small"><b>${fotos.length} ${fotos.length===1?"foto lista":"fotos listas"}</b> <button class="link" id="tkX">Empezar de nuevo</button></p><button class="btn pri wide" id="tkOk">Leer ticket</button>`:""}`,pn=>{
+    const q=x=>pn.querySelector(x);
+    q("#tkF").addEventListener("change",e=>{fotos=[...fotos,...e.target.files].slice(0,3);pintar()});
+    const x=q("#tkX");if(x)x.addEventListener("click",()=>{fotos=[];pintar()});
+    const ok=q("#tkOk");if(ok)ok.addEventListener("click",async()=>{
+      ok.disabled=true;ok.innerHTML=`<span class="spinner"></span> Leyendo el ticket…`;
+      try{
+        const imagenes=[];for(const f of fotos)imagenes.push({imagen:await fotoABase64(f,2400000,.85),media_type:"image/jpeg"});
+        const r=await llamarIA("ticket",{imagenes});
+        if(!r||!r.legible||!(r.items||[]).length){aviso("No pude leer el ticket. Probá con una foto más cerca, derecha y con buena luz.");pintar();return}
+        revisarTicket(r);
+      }catch(e){aviso(e.message||"No se pudo leer el ticket.");pintar()}
+    });
+  });
+  pintar();
+}
+function revisarTicket(r){
+  const items=r.items.map((x,i)=>Object.assign({i},x));
+  const coinciden=n=>compras().filter(c=>!c.hecho).filter(c=>{const a=norm(c.nombre);return a&&(n.includes(a)||a.includes(n)||a.split(" ").some(w=>w.length>3&&n.includes(w)))});
+  abrir(`<h2>Revisá el ticket</h2>
+   <p class="small muted">${esc(r.comercio||"Súper")}${r.fecha?` · ${esc(fechaCorta(r.fecha))}`:""}. Destildá lo que no quieras guardar y corregí los nombres si hace falta.</p>
+   <div class="fld" id="tkL">${items.map(x=>`<div class="tk"><input type="checkbox" data-i="${x.i}" ${x.comida?"checked":""} aria-label="Guardar ${esc(x.nombre)}"><input class="inp" data-n="${x.i}" value="${esc(x.nombre)}" maxlength="60" aria-label="Nombre"><input class="inp" data-c="${x.i}" value="${esc(x.cant)}" maxlength="30" placeholder="cant." aria-label="Cantidad">${x.precio!==null?`<small>${fmtPesos(x.precio,r.moneda)}</small>`:"<small></small>"}</div>`).join("")}</div>
+   <label class="check"><input type="checkbox" id="tkD" checked> Sumar lo marcado a la despensa</label>
+   <label class="check"><input type="checkbox" id="tkC" checked> Sacar de la lista de compras lo que ya compré</label>
+   <label class="check"><input type="checkbox" id="tkG" ${r.total!==null?"checked":""}> Guardar el gasto del ticket</label>
+   <label class="fld"><span>Total del ticket (${r.moneda==="USD"?"US$":"$"})</span><input class="inp" id="tkT" inputmode="decimal" value="${r.total!==null?String(r.total).replace(".",","):""}"></label>
+   <button class="btn pri wide" id="tkOk">Guardar</button>`,pn=>{
+    const q=x=>pn.querySelector(x);
+    q("#tkOk").addEventListener("click",()=>{
+      const sel=items.filter(x=>q(`[data-i="${x.i}"]`).checked).map(x=>({nombre:q(`[data-n="${x.i}"]`).value.trim(),cant:q(`[data-c="${x.i}"]`).value.trim(),cat:x.cat})).filter(x=>x.nombre);
+      let nD=0,nC=0;
+      if(q("#tkD").checked&&sel.length)cambiarComp("despensa",d=>{d.items=d.items||[];sel.forEach(x=>{const ya=d.items.find(y=>norm(y.nombre)===norm(x.nombre));if(ya){if(x.cant)ya.cant=x.cant}else{d.items.push({id:uid(),nombre:x.nombre,cant:x.cant,cat:CAT_IDS.includes(x.cat)?x.cat:"otr"});nD++}})},true);
+      if(q("#tkC").checked&&sel.length){const fuera=new Set();sel.forEach(x=>coinciden(norm(x.nombre)).forEach(c=>fuera.add(c.id)));nC=fuera.size;
+        if(nC)cambiarComp("compras",d=>{d.items=(d.items||[]).filter(c=>!fuera.has(c.id))},true)}
+      const tot=numIn(q("#tkT").value);
+      if(q("#tkG").checked&&isNum(tot)&&tot>0)cambiarComp("gastos",d=>{d.items=d.items||[];
+        d.items.push({id:uid(),fecha:r.fecha&&r.fecha<=hoyStr()?r.fecha:hoyStr(),comercio:r.comercio||"",total:Math.round(tot*100)/100,moneda:r.moneda||"UYU",n:sel.length});
+        const lim=addDays(hoyStr(),-730);d.items=d.items.filter(x=>String(x.fecha)>=lim)},true);
+      cerrar();render();
+      aviso([nD?`${nD} ${nD===1?"producto nuevo":"productos nuevos"} en la despensa`:sel.length&&q("#tkD").checked?"Despensa actualizada":"",nC?`${nC} ${nC===1?"salió":"salieron"} de la lista de compras`:"",q("#tkG").checked&&isNum(tot)&&tot>0?`gasto de ${fmtPesos(tot,r.moneda)} guardado`:""].filter(Boolean).join(" · ")||"Listo");
+    });
+  });
+}
+
 function vistaCompras(){
   const it=compras();const pend=it.filter(x=>!x.hecho),hechos=it.filter(x=>x.hecho);
   const fila=x=>`<div class="buy ${x.hecho?"hecho":""}"><button class="pitem" data-a="toggleCompra" data-id="${x.id}" aria-pressed="${!!x.hecho}"><span class="box">${x.hecho?"✓":""}</span><span><span class="nm">${esc(x.nombre)}</span>${x.cant?` <small>· ${esc(x.cant)}</small>`:""}${x.origen?`<span class="org">${esc(x.origen)}</span>`:""}</span></button><button class="del" data-a="delCompra" data-id="${x.id}" aria-label="Quitar ${esc(x.nombre)}">×</button></div>`;
   return `<section class="sec">
-    <div class="row"><button class="btn pri" data-a="nuevaCompra">+ Agregar</button>${ui.compraGen?`<button class="btn" disabled><span class="spinner"></span> Armando…</button>`:`<button class="btn" data-a="compraSemana">${AI==="off"?"Sumar faltantes de las recetas":"Armar compra de la semana"}</button>`}</div>
+    ${resumenGasto()}
+    <div class="row"><button class="btn pri" data-a="nuevaCompra">+ Agregar</button>${FOTO?`<button class="btn" data-a="ticket">Cargar ticket</button>`:""}${ui.compraGen?`<button class="btn" disabled><span class="spinner"></span> Armando…</button>`:`<button class="btn" data-a="compraSemana">${AI==="off"?"Sumar faltantes de las recetas":"Armar compra de la semana"}</button>`}</div>
     <p class="hint">${AI==="off"?"Sin IA, el botón suma los faltantes de las recetas.":`Lee las rutinas de comidas${COMPARTE()&&PERS.length>1?" de todos":""} y lo que hay en la despensa.`}</p>
   </section>
   ${it.length?`<section class="pantry">
@@ -1203,7 +1271,7 @@ function hojaCocinamos(r,opt={}){
   const dsp=despensa();const usados=dsp.filter(d=>{const n=norm(d.nombre);return (r.ingredientes||[]).some(i=>{const t=norm(i.item);return t.includes(n)||n.split(" ").some(w=>w.length>3&&t.includes(w))})});
   const porOpts=Object.entries(PORC).filter(([k])=>k!=="x").map(([k,o])=>[k,o.l]);
   abrir(`<h2>${esc(r.titulo)}</h2>
-   <p class="small muted">Anotala como comida y actualizá la despensa en un paso.</p>
+   <p class="small muted">${opt.f&&opt.f!==hoyStr()?`Se anota el ${fechaLarga(opt.f).toLowerCase()}.`:"Anotala como comida y actualizá la despensa en un paso."}</p>
    ${opciones("slot",SLOTS,opt.slot||slotPorHora())}
    ${comp.length?`<div class="fld"><span>¿Quiénes comieron?</span>${opciones("para",[["dos",comp.length===1?"Los dos":"Todos"],["yo","Solo "+pf.nombre]],"dos")}</div>`:""}
    <div class="fld"><span>Porción de ${esc(pf.nombre)}</span>${opciones("por",porOpts,"m")}</div>
@@ -1214,7 +1282,7 @@ function hojaCocinamos(r,opt={}){
     const q=s=>pn.querySelector(s);
     const gp=q('[data-g="para"]');if(gp)gp.addEventListener("change",()=>{q("#cP2").hidden=valGrupo(pn,"para")!=="dos"});
     q("#cOk").addEventListener("click",()=>{
-      const f=hoyStr(),sl=valGrupo(pn,"slot")||"cena",hora=horaAhora(),todos=comp.length&&valGrupo(pn,"para")==="dos",grupo=todos?uid():"";
+      const f=opt.f||hoyStr(),sl=valGrupo(pn,"slot")||"cena",hora=f===hoyStr()?horaAhora():"",todos=comp.length&&valGrupo(pn,"para")==="dos",grupo=todos?uid():"";
       const mk=porc=>{const m=pm(porc);return {id:uid(),slot:sl,hora,texto:r.titulo,porcion:porc,cant:"",kcal:Math.round(r.kcal*m),prot:Math.round(r.prot*m),veg:r05((+r.veg||0)*m),ultra:false,fuente:"receta",nota:"Valores por porción de la receta.",grupo}};
       cambiarMes(p,f,d=>{(d.comidas[f]=d.comidas[f]||[]).push(mk(valGrupo(pn,"por")||"m"))},true);
       if(todos)comp.forEach(x=>cambiarMes(x,f,d=>{(d.comidas[f]=d.comidas[f]||[]).push(mk(valGrupo(pn,"por2_"+x)||"m"))},true));
@@ -1441,9 +1509,9 @@ const A={
   cocinamos:d=>{const r=recDe(d.src,d.i);if(r)hojaCocinamos(r)},
   faltaCompra:d=>{const r=recDe(d.src,d.i);if(!r)return;const n=agregarACompras((r.faltan||[]).map(x=>({nombre:x})),r.titulo);aviso(n?`${n} ${n===1?"producto sumado":"productos sumados"} a la compra`:"Ya estaban en la lista")},
   recMenu:d=>{const r=recDe(d.src,d.i);if(r)hojaRecMenu(r)},
-  semNav:d=>{ui.semana=addDays(ui.semana||lunesDe(hoyStr()),+d.d);render();window.scrollTo(0,0)},
+  semNav:d=>{ui.semMenu=addDays(ui.semMenu||lunesDe(hoyStr()),+d.d);render();window.scrollTo(0,0)},
   semTodo:()=>{ui.menuTodo=!ui.menuTodo;render()},
-  semCompra:()=>compraDelMenu(ui.semana||lunesDe(hoyStr())),
+  semCompra:()=>compraDelMenu(ui.semMenu||lunesDe(hoyStr())),
   menuEditar:d=>hojaMenu(d.l,d.d,d.s),
   menuVer:d=>{const it=itemMenu(d.l,d.d,d.s);if(it)hojaRecetaMenu(it)},
   menuComer:d=>comerDelMenu(d.l,d.d,d.s),
@@ -1454,6 +1522,8 @@ const A={
   toggleCompra:d=>cambiarComp("compras",x=>{const y=(x.items||[]).find(z=>z.id===d.id);if(y)y.hecho=!y.hecho}),
   delCompra:d=>cambiarComp("compras",x=>{x.items=(x.items||[]).filter(z=>z.id!==d.id)}),
   borrarHechos:()=>{cambiarComp("compras",x=>{x.items=(x.items||[]).filter(z=>!z.hecho)});aviso("Comprados borrados de la lista")},
+  ticket:()=>hojaTicket(),
+  verGastos:()=>hojaGastos(),
   comprasADespensa:()=>{const h=compras().filter(x=>x.hecho);if(!h.length)return;
     cambiarComp("despensa",x=>{x.items=x.items||[];h.forEach(c=>{const ya=x.items.find(y=>norm(y.nombre)===norm(c.nombre));if(ya){if(c.cant)ya.cant=c.cant}else x.items.push({id:uid(),nombre:c.nombre,cant:c.cant||"",cat:c.cat||"otr"})})},true);
     cambiarComp("compras",x=>{x.items=(x.items||[]).filter(z=>!z.hecho)});aviso(`${h.length} productos pasaron a la despensa`)},
@@ -1541,6 +1611,6 @@ if("serviceWorker" in navigator&&location.protocol==="https:"){
     reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w)return;w.addEventListener("statechange",()=>{if(w.state==="installed"&&navigator.serviceWorker.controller)aviso("Hay una versión nueva: se aplica la próxima vez que abras la app.")})});
   }).catch(()=>{})});
 }
-if(new URLSearchParams(location.search).has("test")&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname))window.__pp={S,ui,get ESP(){return ESP},get PERS(){return PERS},render};
+if(new URLSearchParams(location.search).has("test")&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname))window.__pp={S,ui,get ESP(){return ESP},get PERS(){return PERS},render,revisarTicket};
 boot();
 })();

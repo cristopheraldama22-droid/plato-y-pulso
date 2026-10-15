@@ -61,7 +61,7 @@ async function atender(req: Request, deps: Deps, responder: (status: number, cue
   const est = await deps.estado(espacio);
   if (!est || !est.activo) return responder(403, { error: "espacio_suspendido", mensaje: "El espacio está suspendido." });
   if (est.vencido) return responder(402, { error: "plan_vencido", mensaje: "Terminó tu período con IA. La app sigue funcionando: las estimaciones salen de la tabla." });
-  if (tarea === "foto" && !est.foto) return responder(403, { error: "plan_sin_foto", mensaje: "Tu plan no incluye estimar desde fotos." });
+  if ((tarea === "foto" || tarea === "ticket") && !est.foto) return responder(403, { error: "plan_sin_foto", mensaje: "Tu plan no incluye estimar desde fotos." });
   if (est.gastado >= est.tope) return responder(402, { error: "tope_plan", mensaje: est.tope > 0 ? "Se usó todo el cupo de IA del plan este mes." : "Tu plan no incluye IA.", gastado: est.gastado, tope: est.tope });
   const recientes = await deps.llamadasRecientes(user, 300);
   if (recientes >= (deps.maxLlamadas ?? 40)) return responder(429, { error: "muchas_llamadas", mensaje: "Muchas consultas seguidas. Esperá unos minutos." });
