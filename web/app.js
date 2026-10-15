@@ -478,7 +478,7 @@ function renderEntrada(){
       <label class="fld"><span>Tu nombre</span><input class="inp" id="nYo" autocomplete="given-name"></label>
       <p class="hint">Hogar: varias personas comparten el espacio y todas ven y anotan los datos de todas. Personal: es solo para vos y nadie más se puede sumar.</p>
       <button class="btn pri" data-a="crearEsp">Crear</button></section>
-    <button class="link" data-a="salir">Cerrar sesión</button>
+    <button class="link" data-a="cerrarSesion">Cerrar sesión</button>
     ${entrada.error?`<p class="alert small">${esc(entrada.error)}</p>`:""}`;
   }
   $("#app").innerHTML=h;
@@ -1211,7 +1211,7 @@ async function hojaAjustes(){
     <div id="aImpBox"></div>
    </section>
    <section class="sec"><h3>Cuenta</h3><p class="small muted">${esc(SESION?SESION.email:"")}</p>
-    <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="salir">Cerrar sesión</button></div>
+    <div class="row"><button class="btn" data-x="cambiarEsp">Cambiar de espacio</button><button class="btn" data-x="cerrarSesion">Cerrar sesión</button></div>
     ${B.modo==="nube"?`<button class="btn" data-x="salirTodos">Cerrar sesión en todos mis dispositivos</button><p class="hint">Usalo si perdiste un celular o entraste en una computadora ajena.</p>`:""}
     ${rol!=="dueno"?`<button class="btn warn" id="ajIrme">Salir de este espacio</button>`:""}
     <p class="small"><a href="privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
@@ -1296,7 +1296,10 @@ const A={
     entrada.ocupado=true;entrada.error="";render();
     try{await B.aceptarPrivacidad(PRIV_V);entrada.ocupado=false;await alEntrar()}catch(e){entrada.ocupado=false;entrada.error=e.message;render()}},
   salirTodos:async()=>{saliendo=true;try{await B.salirTodos()}catch(e){aviso(e.message)}await A.salir();aviso("Se cerró la sesión en todos tus dispositivos")},
-  salir:async()=>{saliendo=true;try{await B.salir()}catch(e){}saliendo=false;if(desuscribir){desuscribir();desuscribir=null}SESION=null;ESP=null;YO=null;ETAPA="login";entrada.paso="email";aplicarMarca();render()},
+  cerrarSesion:()=>{if(pendientes.size&&!confirm(`Hay ${pendientes.size} cambio(s) sin subir porque no hay conexión. Si cerrás sesión ahora se pierden. ¿Cerrar igual?`))return;A.salir()},
+  salir:async()=>{saliendo=true;try{await B.salir()}catch(e){}saliendo=false;
+    pendientes.clear();try{Object.keys(localStorage).filter(k=>k.startsWith("pp:")).forEach(k=>localStorage.removeItem(k))}catch(e){}
+    entrada.email="";if(desuscribir){desuscribir();desuscribir=null}SESION=null;ESP=null;YO=null;ETAPA="login";entrada.paso="email";aplicarMarca();render()},
   objetivo:d=>cambiarPerfil(ui.persona,x=>{x.objetivo=d.o}),
   perfil:()=>hojaPerfil(),
   anotarPeso:()=>hojaPeso(),
