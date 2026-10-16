@@ -108,7 +108,7 @@ Deno.test("recetas: usa el modelo de recetas, limpia y devuelve 5", async () => 
   const p = pedidos[0] as { model: string; messages: { content: { text: string }[] }[] };
   assertEquals(p.model, "claude-haiku-5-5");
   const txt = p.messages[0].content[0].text;
-  assertMatch(txt, /para 2 personas/); assertMatch(txt, /ganar músculo/); assertMatch(txt, /Rápidas/); assertMatch(txt, /Tortilla/);
+  assertMatch(txt, /para 2 personas/); assertMatch(txt, /Solo recetas reales y conocidas/); assertMatch(txt, /ganar músculo/); assertMatch(txt, /Rápidas/); assertMatch(txt, /Tortilla/);
 });
 
 Deno.test("foto: arma el bloque de imagen y valida el contenido", () => {

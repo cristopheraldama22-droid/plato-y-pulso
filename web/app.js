@@ -453,12 +453,12 @@ const ICON={
  hoy:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
  comidas:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/>',
  entrenos:'<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
- semana:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3"/>',
+ plan:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3"/>',
  rutinas:'<path d="M4 12a8 8 0 0113.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.6L4 15.5M4 20v-4.5h4.5"/>',
  cocina:'<path d="M4.5 10.5h15v5.5a4 4 0 01-4 4h-7a4 4 0 01-4-4zM2.5 10.5h19M9.5 7c0-1 1-1.5 1-2.6M14 7c0-1 1-1.5 1-2.6"/>',
  resumen:'<path d="M5 20v-7M12 20V5M19 20v-10M3 20.5h18"/>'
 };
-const TABS=[["hoy","Hoy"],["comidas","Comidas"],["semana","Semana"],["entrenos","Entrenos"],["rutinas","Rutinas"],["cocina","Cocina"],["resumen","Resumen"]];
+const TABS=[["hoy","Hoy"],["plan","Planificación"],["entrenos","Entrenos"],["cocina","Cocina"],["resumen","Resumen"]];
 const PERSONALES=["hoy","comidas","entrenos","rutinas","resumen"];
 
 function nombreApp(){return (ESP&&ESP.marca&&ESP.marca.nombre_app)||"Plato y Pulso"}
@@ -473,6 +473,7 @@ function aplicarMarca(){
 function render(){
   if(ETAPA!=="app"){renderEntrada();return}
   document.body.classList.remove("entrada");
+  if(ui.tab==="semana"||ui.tab==="rutinas"){ui.plan=ui.tab==="semana"?"menu":"entreno";ui.tab="plan"}
   if(!TABS.some(t=>t[0]===ui.tab))ui.tab="hoy";
   if(!PERS.includes(ui.persona))ui.persona=YO;
   $("#who").hidden=PERS.length<2;
@@ -635,7 +636,7 @@ function comerDelMenu(lun,dia,slot){
   else hojaCocinamos(it,{slot,f,alGuardar:fin});
 }
 function bloqueMenuHoy(lun,dk,slots){
-  return `<section class="sec"><div class="sec-h"><h2>Hoy en el menú</h2><button class="link" data-a="tab" data-t="semana">Ver semana</button></div><div class="card">${slots.map(([k,l])=>{const it=itemMenu(lun,dk,k);
+  return `<section class="sec"><div class="sec-h"><h2>Hoy en el menú</h2><button class="link" data-a="verMenu">Ver semana</button></div><div class="card">${slots.map(([k,l])=>{const it=itemMenu(lun,dk,k);
     return `<div class="plan"><div class="pt"><small>${l}</small>${esc(it.titulo)}</div><div class="row tight">${it.tipo==="receta"?`<button class="btn sm" data-a="menuVer" data-l="${lun}" data-d="${dk}" data-s="${k}">Receta</button>`:""}<button class="btn sm pri" data-a="menuComer" data-l="${lun}" data-d="${dk}" data-s="${k}">La comimos</button></div></div>`}).join("")}</div></section>`;
 }
 function hojaMenu(lun,dia,slot){
@@ -685,6 +686,13 @@ function compraDelMenu(lun){
   const n=items.length?agregarACompras(items,"menú "+fechaCorta(lun)):0;
   aviso((n?`${n} ${n===1?"ingrediente sumado":"ingredientes sumados"} a la compra`:items.length?"Ya estaba todo en la lista":"No hay ingredientes nuevos para comprar")+(sinReceta?` · ${sinReceta} ${sinReceta===1?"comida no tiene":"comidas no tienen"} receta`:""));
 }
+VISTAS.plan=function(){
+  const v=ui.plan||"menu";
+  const seg=`<section class="sec"><h1>Planificación</h1>
+    <div class="seg"><button data-a="planSeg" data-v="menu" aria-pressed="${v==="menu"}">Menú</button><button data-a="planSeg" data-v="entreno" aria-pressed="${v==="entreno"}">Entrenos</button><button data-a="planSeg" data-v="comidas" aria-pressed="${v==="comidas"}">Semana tipo</button></div></section>`;
+  if(v==="menu")return seg+VISTAS.semana();
+  ui.rut=v==="entreno"?"entreno":"comidas";return seg+VISTAS.rutinas();
+};
 VISTAS.semana=function(){
   const hoy=hoyStr(),lun=ui.semMenu||lunesDe(hoy),sem=semanaMenu(lun);
   const slots=MENU_SLOTS.filter(([k])=>ui.menuTodo||k==="almuerzo"||k==="cena"||DIAS.some(d=>(sem[d]||{})[k]));
@@ -709,6 +717,7 @@ VISTAS.semana=function(){
 };
 
 VISTAS.hoy=function(){
+  if(ui.fechaCom&&ui.fechaCom<hoyStr())return vistaDia();
   const p=ui.persona,pf=perfil(p),f=hoyStr(),dk=diaKey(f);
   const c=comidasDe(p,f),e=entrenosDe(p,f),r=racha(p),mt=metas(p);
   const planE=pf.rutEntreno[dk],planC=pf.rutComidas[dk]||{};
@@ -727,9 +736,9 @@ VISTAS.hoy=function(){
   const pendT=AI==="ok"?pendientesTabla().length:0;
   return `
   <section class="sec">
-    <p class="eyebrow">${fechaLarga(f)}</p>
+    <div class="datenav"><button class="arrow" data-a="diaCom" data-d="-1" aria-label="Día anterior">‹</button><div class="dl"><b>Hoy</b><span class="small muted">${fechaLarga(f)}</span></div><button class="arrow" disabled aria-label="Día siguiente">›</button></div>
     <div class="sec-h"><h1>Hola, ${esc(pf.nombre)}</h1><button class="link" data-a="perfil">Mis datos</button></div>
-    <div class="seg" role="group" aria-label="Objetivo">${Object.entries(OBJ).map(([k,l])=>`<button data-a="objetivo" data-o="${k}" aria-pressed="${pf.objetivo===k}">${l}</button>`).join("")}</div>
+    ${(S.perfiles[p]||{}).objetivo?"":`<div class="card sec"><b>¿Cuál es tu objetivo?</b><p class="small muted">Lo elegís una vez; después lo cambiás en Mis datos.</p><div class="seg" role="group" aria-label="Objetivo">${Object.entries(OBJ).map(([k,l])=>`<button data-a="objetivo" data-o="${k}" aria-pressed="false">${l}</button>`).join("")}</div></div>`}
     <p class="coach">${esc(msg)}</p>
     ${alerta?`<div class="alert"><b>Los últimos días anotaste bastante poco</b><p class="small">Si es porque te olvidás de anotar algunas cosas, todo bien. Si estás comiendo así, puede dejarte sin energía para el día y el entreno. Si te pasa seguido, vale la pena charlarlo con un profesional.</p><div class="row tight"><button class="btn sm" data-a="alertaOk">Entendido</button></div></div>`:""}
     ${mt.hay?"":`<div class="card sec"><b>Completá tus datos para ver tu referencia diaria</b><p class="small muted">Con sexo, edad, peso, altura y tu actividad calculo cuántas calorías y proteínas te conviene apuntar, de forma aproximada y según tu objetivo.</p><button class="btn pri" data-a="perfil">Completar mis datos</button></div>`}
@@ -751,18 +760,25 @@ VISTAS.hoy=function(){
   ${planComidas.length?`<section class="sec"><h2>Tu plan de comidas para hoy</h2><div class="card">${planComidas.map(([k,l])=>`<div class="plan"><div class="pt"><small>${l}</small>${esc(planC[k])}</div><button class="btn sm" data-a="comiPlan" data-s="${k}">Lo comí</button></div>`).join("")}</div></section>`:""}`;
 };
 
-VISTAS.comidas=function(){
-  const p=ui.persona,f=ui.fechaCom,esHoy=f===hoyStr();const pl=platos();
-  return `
-  <section class="sec">
+function vistaDia(){
+  const p=ui.persona,f=ui.fechaCom,e=entrenosDe(p,f);
+  return `<section class="sec">
     <div class="datenav"><button class="arrow" data-a="diaCom" data-d="-1" aria-label="Día anterior">‹</button>
-      <div class="dl"><b>${esHoy?"Hoy":fechaLarga(f)}</b>${esHoy?`<span class="small muted">${fechaLarga(f)}</span>`:`<button class="link" data-a="diaCom" data-d="0" style="justify-self:center;min-height:32px;padding:0">Volver a hoy</button>`}</div>
-      <button class="arrow" data-a="diaCom" data-d="1" aria-label="Día siguiente" ${f>=hoyStr()?"disabled":""}>›</button></div>
+      <div class="dl"><b>${fechaLarga(f)}</b><button class="link" data-a="diaCom" data-d="0" style="justify-self:center;min-height:32px;padding:0">Volver a hoy</button></div>
+      <button class="arrow" data-a="diaCom" data-d="1" aria-label="Día siguiente">›</button></div>
     ${tiles(p,f)}
     <div class="row"><button class="btn pri" data-a="nuevaComida" data-f="${f}">+ Anotar comida</button>${FOTO?`<button class="btn" data-a="nuevaComida" data-f="${f}" data-foto="1">Desde una foto</button>`:""}</div>
   </section>
-  <section class="card">${bloqueComidas(p,f)}</section>
+  <section class="card"><div class="sec-h" style="margin-bottom:6px"><h2>Comidas</h2></div>${bloqueComidas(p,f)}</section>
   ${bloqueCalidad(p,f)}
+  <section class="sec">
+    <div class="sec-h"><h2>Entreno</h2><button class="btn sm pri" data-a="nuevoEntreno" data-f="${f}">+ Entreno</button></div>
+    ${e.length?e.map(x=>filaEntreno(p,x,f)).join(""):`<p class="empty">Ese día no hay entreno anotado.</p>`}
+  </section>`;
+}
+function vistaPlatos(){
+  const pl=platos();
+  return `
   <section class="sec">
     <div class="sec-h"><h2>Platos guardados</h2><span class="small muted">Compartidos · valores por porción mediana</span></div>
     ${pl.length?`<div class="pantry">${pl.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(x=>`<button class="pitem" data-a="editPlato" data-id="${x.id}"><span>${esc(x.nombre)}</span><small><span class="k">~${fmtN(x.kcal)}</span> · <span class="pr">~${fmtN(x.prot)} g</span></small></button>`).join("")}</div>`:`<p class="empty">Cuando anotes una comida, marcá "Guardar en mis platos" y la vas a poder elegir con un toque la próxima vez. Las comidas que repetís también aparecen solas como frecuentes.</p>`}
@@ -797,10 +813,10 @@ VISTAS.rutinas=function(){
   const vacia=esE?!DIAS.some(k=>pf.rutEntreno[k]&&pf.rutEntreno[k].tipo):!DIAS.some(k=>pf.rutComidas[k]&&Object.values(pf.rutComidas[k]).some(v=>v&&v.trim()));
   return `
   <section class="sec">
-    <h1>Rutinas de ${esc(pf.nombre)}</h1>
-    <div class="seg"><button data-a="rutSeg" data-r="entreno" aria-pressed="${esE}">Entrenamiento</button><button data-a="rutSeg" data-r="comidas" aria-pressed="${!esE}">Comidas</button></div>
+    <p class="eyebrow">${esE?"Rutina de entrenos":"Semana tipo de comidas"} de ${esc(pf.nombre)}</p>
+    ${esE?"":`<p class="hint">La semana tipo es la base que se repite todas las semanas. Para planificar una semana puntual usá Menú.</p>`}
     ${vacia?`<p class="coach">Tu rutina ${esE?"de entreno":"de comidas"} está vacía. Podés cargar un ejemplo para "${OBJ[pf.objetivo]}" y después ajustarlo día por día.</p>`:""}
-    ${!esE&&!vacia?`<p class="hint">Desde Cocina › Compras podés armar la lista del super a partir de estas rutinas.</p>`:""}
+    ${!esE&&!vacia?`<p class="hint">Desde Cocina › Compras podés armar la lista del súper a partir de esta semana tipo.</p>`:""}
   </section>
   <section class="days">
     ${DIAS.map(k=>{
@@ -814,9 +830,9 @@ VISTAS.rutinas=function(){
 
 VISTAS.cocina=function(){
   const pend=compras().filter(x=>!x.hecho).length;
-  return `<section class="sec"><h1>Cocina</h1><p class="small muted">Compartida entre los dos</p>
-    <div class="seg"><button data-a="cocSeg" data-c="despensa" aria-pressed="${ui.cocina==="despensa"}">Despensa</button><button data-a="cocSeg" data-c="recetas" aria-pressed="${ui.cocina==="recetas"}">Recetas</button><button data-a="cocSeg" data-c="compras" aria-pressed="${ui.cocina==="compras"}">Compras${pend?` (${pend})`:""}</button></div></section>
-    ${ui.cocina==="recetas"?vistaRecetas():ui.cocina==="compras"?vistaCompras():vistaDespensa()}`;
+  return `<section class="sec"><h1>Cocina</h1>${COMPARTE()&&PERS.length>1?`<p class="small muted">Compartida por todo el hogar</p>`:""}
+    <div class="seg"><button data-a="cocSeg" data-c="despensa" aria-pressed="${ui.cocina==="despensa"}">Despensa</button><button data-a="cocSeg" data-c="recetas" aria-pressed="${ui.cocina==="recetas"}">Recetas</button><button data-a="cocSeg" data-c="platos" aria-pressed="${ui.cocina==="platos"}">Platos</button><button data-a="cocSeg" data-c="compras" aria-pressed="${ui.cocina==="compras"}">Compras${pend?` (${pend})`:""}</button></div></section>
+    ${ui.cocina==="recetas"?vistaRecetas():ui.cocina==="compras"?vistaCompras():ui.cocina==="platos"?vistaPlatos():vistaDespensa()}`;
 };
 function vistaDespensa(){
   const it=despensa();const tiene=new Set(it.map(x=>norm(x.nombre)));
@@ -1553,7 +1569,7 @@ async function hojaAjustes(){
    ========================================================= */
 const A={
   persona:d=>{ui.persona=d.p;lsSet("pp:persona",d.p);render()},
-  tab:d=>{ui.tab=d.t;lsSet("pp:tab",d.t);render();window.scrollTo(0,0)},
+  tab:d=>{if(d.t==="hoy"&&ui.tab==="hoy")ui.fechaCom=hoyStr();ui.tab=d.t;lsSet("pp:tab",d.t);render();window.scrollTo(0,0)},
   ajustes:()=>{if(ETAPA==="app")hojaAjustes()},
   lgEnviar:async()=>{const i=$("#lgE");const em=(i?i.value:entrada.email).trim().toLowerCase();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){entrada.error="Escribí un mail válido.";render();return}
@@ -1608,6 +1624,8 @@ const A={
   editRutE:d=>hojaRutE(d.d),
   editRutC:d=>hojaRutC(d.d),
   ejemploRut:()=>hojaEjemplo(),
+  planSeg:d=>{ui.plan=d.v;render();window.scrollTo(0,0)},
+  verMenu:()=>{ui.tab="plan";ui.plan="menu";lsSet("pp:tab","plan");render();window.scrollTo(0,0)},
   cocSeg:d=>{ui.cocina=d.c;lsSet("pp:cocina",d.c);render()},
   recVista:d=>{ui.recVista=d.v;render()},
   nuevoIng:()=>hojaIng(),

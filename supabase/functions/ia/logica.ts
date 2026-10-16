@@ -151,6 +151,8 @@ ${mus ? "Al menos una persona quiere ganar músculo: priorizá 35 g de proteína
 ${filtros.length ? "Condiciones pedidas: " + filtros.join("; ") + "." : ""}
 ${antojo ? `Idea o antojo de la casa: ${q(antojo)}. Tenelo en cuenta.` : ""}
 Reglas:
+- Solo recetas reales y conocidas: platos que existen y se cocinan en casas (cocina uruguaya y rioplatense o clásicos internacionales que cualquiera reconoce), con su nombre habitual. Nada de combinaciones inventadas, fusiones raras ni ingredientes que no van juntos.
+- Técnicas, temperaturas, tiempos y cantidades realistas y probados; que alguien que cocina en casa pueda seguirla y le salga. Si con lo de la despensa no alcanza para una receta real, usá una receta real igual y poné en "faltan" lo que haga falta, antes que inventar.
 - Las 5 bien distintas entre sí: distinto tipo de plato (por ejemplo horno, salteado, guiso, ensalada completa, tarta o desayuno/merienda), distinto ingrediente principal y distinto método de cocción.
 - No repitas ni hagas variantes cercanas de estas recetas: ${evitar.length ? evitar.join("; ") : "(ninguna)"}.
 - Ingredientes que se consiguen en un supermercado uruguayo, con nombres locales (morrón, zapallito, boniato, choclo, nalga, suprema, etc.).
