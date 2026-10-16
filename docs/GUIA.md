@@ -122,7 +122,7 @@ En Supabase › **Table Editor**:
 
 ## Respaldos
 
-El plan gratis de Supabase no hace copias diarias. El repositorio trae un respaldo semanal automático (`.github/workflows/respaldo.yml`), cifrado y guardado 90 días en GitHub.
+El plan gratis de Supabase no hace copias diarias. El repositorio trae un respaldo diario automático (`.github/workflows/respaldo.yml`, a las 03:00 de Uruguay), cifrado y guardado 30 días en GitHub.
 
 1. En GitHub › el repositorio › **Settings › Secrets and variables › Actions › New repository secret**, cargá:
    - `SUPABASE_DB_URL`: en Supabase, botón **Connect** › **Session pooler** › copiá la URI y reemplazá `[YOUR-PASSWORD]` por la contraseña de la base.

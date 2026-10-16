@@ -159,6 +159,18 @@ Deno.test("ticket: el plan sin fotos no lo permite y valida las imágenes", asyn
   assertEquals(error, "imagen_invalida");
 });
 
+Deno.test("recetas: respeta las restricciones de la casa", () => {
+  const p = armarPedido("recetas", { restricciones: ["sin_tacc", "vegano", "xyzzy_falsa"], alergias: "maní" });
+  const txt = (p.contenido[0] as { text: string }).text;
+  assertMatch(txt, /RESTRICCIONES OBLIGATORIAS/);
+  assertMatch(txt, /aptas para celíacos/);
+  assertMatch(txt, /veganas/);
+  assertMatch(txt, /maní/);
+  assert(!/xyzzy/.test(txt), "una restricción desconocida no entra al pedido");
+  const sin = (armarPedido("recetas", {}).contenido[0] as { text: string }).text;
+  assertMatch(sin, /Sin restricciones alimentarias/);
+});
+
 Deno.test("extraerJSON tolera texto alrededor", () => {
   assertEquals(extraerJSON('Claro: {"a":1} listo'), { a: 1 });
 });

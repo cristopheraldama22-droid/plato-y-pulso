@@ -1,5 +1,5 @@
-# Respaldo semanal de la base de datos (Supabase gratis no hace copias diarias).
-# Guarda un archivo cifrado en GitHub (Actions › Respaldo › Artifacts) por 90 días.
+# Respaldo diario de la base de datos (Supabase gratis no hace copias diarias).
+# Guarda un archivo cifrado en GitHub (Actions › Respaldo › Artifacts) por 30 días.
 # Necesita dos secretos del repositorio (Settings › Secrets and variables › Actions):
 #   SUPABASE_DB_URL  cadena de conexión "Session pooler" de Supabase (botón Connect), con la contraseña
 #   RESPALDO_CLAVE   frase larga para cifrar el respaldo; guardala aparte: sin ella no se puede abrir
@@ -8,7 +8,7 @@ name: Respaldo
 
 on:
   schedule:
-    - cron: "0 6 * * 1"   # lunes 03:00 de Uruguay
+    - cron: "0 6 * * *"   # todos los días a las 03:00 de Uruguay
   workflow_dispatch:
 
 permissions:
@@ -46,5 +46,5 @@ jobs:
         with:
           name: respaldo-${{ github.run_number }}
           path: respaldo-*.tar.gz.gpg
-          retention-days: 90
+          retention-days: 30
           if-no-files-found: error

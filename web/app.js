@@ -62,6 +62,12 @@ const fmtDist=(t,km)=>enMetros(t)?fmtN(Math.round(km*1000))+" m":nf1.format(km)+
 const INTS=[["suave","Suave"],["media","Media"],["alta","Intensa"]];
 const MET=Object.fromEntries(ACTIV.map(([k,,,v])=>[k,{suave:v[0],media:v[1],alta:v[2]}]));
 const OBJ={mantener:"Mantenerme / comer mejor",musculo:"Ganar músculo"};
+const RESTR=[["sin_tacc","Sin TACC (celíaco)"],["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_lactosa","Sin lactosa"]];
+const RESTR_N=Object.fromEntries(RESTR);
+/* Restricciones de las personas para las que se cocina (todas las del hogar si se comparte). */
+function restriccionesCasa(){const quienes=COMPARTE()?PERS:[ui.persona];const r=new Set(),a=[];
+  quienes.forEach(p=>{const pf=perfil(p);pf.restricciones.forEach(x=>r.add(x));if(pf.alergias)a.push(pf.alergias)});
+  return {restricciones:[...r],alergias:a.join("; ").slice(0,300)}}
 const ACT=[["sentado","Sentado casi todo el día"],["depie","De pie o caminando parte del día"],["fisico","Trabajo físico o muy activo"]];
 const PAL={sentado:1.25,depie:1.4,fisico:1.6};
 const PORC={s:{l:"Chica",m:.7},m:{l:"Mediana",m:1},l:{l:"Grande",m:1.4},x:{l:"Otra cantidad",m:1}};
@@ -140,7 +146,7 @@ const ui={persona:"",tab:lsGet("pp:tab")||"hoy",fechaCom:hoyStr(),semana:lunesDe
 const DUENO=()=>"";
 const porciones=()=>COMPARTE()?Math.max(1,PERS.length):1;
 
-function perfil(p){const d=S.perfiles[p]||{};return {nombre:NOMBRES[p]||d.nombre||"Persona",objetivo:d.objetivo==="musculo"?"musculo":"mantener",rutEntreno:d.rutEntreno||{},rutComidas:d.rutComidas||{},sexo:d.sexo==="h"||d.sexo==="m"?d.sexo:"",edad:+d.edad||0,peso:+d.peso||0,altura:+d.altura||0,actividad:PAL[d.actividad]?d.actividad:"depie",metaKcal:+d.metaKcal||0,metaProt:+d.metaProt||0,metaAgua:+d.metaAgua||8,pesos:Array.isArray(d.pesos)?d.pesos:[]}}
+function perfil(p){const d=S.perfiles[p]||{};return {nombre:NOMBRES[p]||d.nombre||"Persona",objetivo:d.objetivo==="musculo"?"musculo":"mantener",rutEntreno:d.rutEntreno||{},rutComidas:d.rutComidas||{},sexo:d.sexo==="h"||d.sexo==="m"?d.sexo:"",edad:+d.edad||0,peso:+d.peso||0,altura:+d.altura||0,actividad:PAL[d.actividad]?d.actividad:"depie",metaKcal:+d.metaKcal||0,metaProt:+d.metaProt||0,metaAgua:+d.metaAgua||8,pesos:Array.isArray(d.pesos)?d.pesos:[],restricciones:(Array.isArray(d.restricciones)?d.restricciones:[]).filter(x=>RESTR_N[x]),alergias:String(d.alergias||"").slice(0,150)}}
 const mesKey=(p,f)=>p+"_"+f.slice(0,7);
 function mesDoc(p,f){return S.meses[mesKey(p,f)]||{persona:p,mes:f.slice(0,7),comidas:{},entrenos:{},extras:{}}}
 const comidasDe=(p,f)=>((mesDoc(p,f).comidas||{})[f])||[];
@@ -401,7 +407,7 @@ async function generar(){
     porciones:porciones(),
     despensa:despensa().map(x=>({nombre:x.nombre,cant:x.cant||""})),
     objetivos:quienes.map(p=>{const m=metas(p);return {nombre:perfil(p).nombre,objetivo:perfil(p).objetivo,kcal:m.kcal||null,prot:m.prot||null}}),
-    filtros:[...ui.filtros],antojo:ui.antojo||"",
+    filtros:[...ui.filtros],antojo:ui.antojo||"",...restriccionesCasa(),
     evitar:(recetasDoc().vistas||[]).slice(-40).concat(favoritas().map(r=>r.titulo))
   };
   try{
@@ -1245,6 +1251,8 @@ function hojaPerfil(){
    <label class="fld"><span>Nombre</span><input class="inp" id="pN" value="${esc(pf.nombre)}"></label>
    <div class="fld"><span>Objetivo</span>${opciones("obj",Object.entries(OBJ),pf.objetivo)}</div>
    <div class="fld"><span>Sexo</span>${opciones("sexo",[["h","Hombre"],["m","Mujer"]],pf.sexo)}</div>
+   <div class="fld"><span>Restricciones alimentarias</span><div class="chips" id="pR">${RESTR.map(([k,l])=>`<button type="button" class="chip" data-r="${k}" aria-pressed="${pf.restricciones.includes(k)}">${l}</button>`).join("")}</div>
+     <input class="inp" id="pAl" maxlength="150" value="${esc(pf.alergias)}" placeholder="Alergias u otras (opcional). Ej: maní, mariscos" aria-label="Alergias u otras restricciones"></div>
    <div class="three">
      <label class="fld"><span>Edad</span><input class="inp" id="pE" inputmode="numeric" value="${pf.edad||""}" placeholder="años"></label>
      <label class="fld"><span>Peso (kg)</span><input class="inp" id="pP" inputmode="decimal" value="${pf.peso?nf1.format(pf.peso):""}" placeholder="kg"></label>
@@ -1269,6 +1277,7 @@ function hojaPerfil(){
         <span class="small muted">Fórmula estándar (Mifflin-St Jeor) más tu actividad. Es orientativa, no una indicación médica.</span>`
         :`<span class="small">Completá sexo, edad, peso y altura y te muestro acá la referencia de calorías y proteínas.</span>`};
     pintar();pn.addEventListener("input",pintar);pn.addEventListener("change",pintar);
+    q("#pR").addEventListener("click",e=>{const b=e.target.closest(".chip");if(b)b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"))});
     q("#pOk").addEventListener("click",async()=>{
       const d=leer();const n=q("#pN").value.trim().slice(0,60)||pf.nombre;
       if(d.edad&&(d.edad<15||d.edad>100)){aviso("Revisá la edad: tiene que estar entre 15 y 100 años.");return}
@@ -1276,6 +1285,7 @@ function hojaPerfil(){
       if(d.altura&&(d.altura<120||d.altura>230)){aviso("Revisá la altura: va en centímetros, por ejemplo 175.");return}
       const mk=Math.round(num("#pMK")),mp=Math.round(num("#pMP")),w=Math.round(num("#pW"));
       cambiarPerfil(p,x=>{x.nombre=n;x.objetivo=d.objetivo;x.sexo=d.sexo;x.actividad=d.actividad;x.edad=Math.round(d.edad)||"";x.altura=Math.round(d.altura)||"";x.metaKcal=mk>0?mk:"";x.metaProt=mp>0?mp:"";x.metaAgua=w>0&&w<30?w:8;
+        x.restricciones=[...q("#pR").querySelectorAll('.chip[aria-pressed="true"]')].map(b=>b.dataset.r);x.alergias=q("#pAl").value.trim().slice(0,150);
         if(d.peso&&Math.abs(d.peso-(+x.peso||0))>=.05)agregarPeso(x,hoyStr(),Math.round(d.peso*10)/10);});
       if(n!==pf.nombre){NOMBRES[p]=n;B.renombrarMiembro(p,n).catch(e=>aviso(e.message))}
       cerrar();aviso("Datos guardados");
@@ -1383,7 +1393,9 @@ function hojaTexto(titulo,texto,ayuda){
 /* ---------- Recetas: generar, cocinar, rutina ---------- */
 const recDe=(src,i)=>src==="fav"?favoritas()[+i]:src==="base"?(ui.baseIdeas||[])[+i]:(recetasDoc().actuales||[])[+i];
 function hojaGenerar(){
+  const rc=restriccionesCasa(),rtxt=[...rc.restricciones.map(x=>RESTR_N[x].toLowerCase()),...(rc.alergias?["sin: "+rc.alergias]:[])].join(", ");
   abrir(`<h2>Generar 5 recetas</h2>
+   ${rtxt?`<p class="pill">Respetando: ${esc(rtxt)}</p>`:`<p class="hint">Si alguien es celíaco, vegetariano o tiene alergias, marcalo en Mis datos y las recetas lo van a respetar.</p>`}
    <p class="small muted">Para ${porciones()} ${porciones()===1?"persona":"personas"}, con lo que hay en la despensa${(COMPARTE()?PERS:[ui.persona]).some(p=>perfil(p).objetivo==="musculo")?" y priorizando proteína":""}.</p>
    <div class="fld"><span>Condiciones (opcional)</span><div class="chips" id="gF">${FILTROS.map(([k,l])=>`<button type="button" class="chip" data-k="${k}" aria-pressed="${ui.filtros.has(k)}">${l}</button>`).join("")}</div></div>
    <label class="fld"><span>Idea o antojo (opcional)</span><input class="inp" id="gA" value="${esc(ui.antojo)}" placeholder="Ej: algo con calabaza, comida de olla, pescado"></label>

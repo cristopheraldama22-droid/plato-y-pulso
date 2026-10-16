@@ -46,6 +46,12 @@ const FILTROS: Record<string, string> = {
 };
 const SLOTS: Record<string, string> = { desayuno: "Desayuno", almuerzo: "Almuerzo", merienda: "Merienda", cena: "Cena", snacks: "Snacks" };
 const CATS = ["prot", "ver", "lac", "alm", "otr"];
+const RESTRICCIONES: Record<string, string> = {
+  sin_tacc: "sin gluten, aptas para celíacos (sin trigo, avena, cebada ni centeno: nada de harina común, pan, pan rallado, fideos ni masas comunes; usar versiones sin TACC certificadas)",
+  vegetariano: "vegetarianas (sin carne, pollo, pescado ni mariscos; huevos y lácteos sí)",
+  vegano: "veganas (sin ningún producto animal: ni carne, pescado, huevos, lácteos ni miel)",
+  sin_lactosa: "sin lactosa (sin leche, manteca, crema ni quesos comunes; se pueden usar versiones deslactosadas)",
+};
 
 const FORMATO_EST = `kcal y prot son enteros (prot en gramos). veg = porciones de verdura o fruta que aporta (0 a 3, puede ser .5; una porción ≈ 80 g). ultra = true solo si es mayormente un producto ultraprocesado industrial (galletitas, fiambres, snacks, gaseosas, panificados industriales).`;
 
@@ -137,6 +143,11 @@ Si en la foto no se ve comida, respondé {"texto":"","kcal":0,"prot":0,"veg":0,"
       const filtros = lista<string>(datos.filtros, 6).map((f) => FILTROS[String(f)]).filter(Boolean);
       const antojo = limpiar(datos.antojo, 200);
       const evitar = lista<string>(datos.evitar, 60).map((t) => limpiar(t, 80)).filter(Boolean);
+      const restr = lista<string>(datos.restricciones, 4).map(String).filter((r) => RESTRICCIONES[r]);
+      const alergias = limpiar(datos.alergias, 300);
+      const reglaRestr = restr.length || alergias
+        ? `- RESTRICCIONES OBLIGATORIAS (alguien de la casa las tiene; las 5 recetas tienen que respetarlas todas, sin excepción y sin "opcional"): ${[...restr.map((r) => RESTRICCIONES[r]), ...(alergias ? [`no usar: ${q(alergias)} (alergias o intolerancias)`] : [])].join("; ")}.`
+        : "- Sin restricciones alimentarias; el criterio es que sean saludables.";
       const mus = objetivos.some((o) => o.musculo);
       const conRef = objetivos.some((o) => o.kcal);
       const objs = objetivos.length
@@ -159,7 +170,7 @@ Reglas:
 ${conRef ? "- Que cada plato principal aporte aproximadamente entre un 25% y un 35% de esas referencias diarias por porción.\n" : ""}- Cantidades para ${porciones} porciones. Entre 4 y 7 pasos claros y concretos, de longitud media.
 - kcal, prot (gramos) y veg (porciones de verdura o fruta, puede ser .5) son aproximadas y por porción.
 - "faltan": ingredientes de la receta que no están en la lista (sin contar sal, pimienta, agua, aceite y especias comunes).${despensa.length ? " Máximo 3 por receta." : ""}
-- Sin restricciones alimentarias; el criterio es que sean saludables.
+${reglaRestr}
 Respondé solo con un array JSON de 5 objetos con esta forma exacta:
 [{"titulo":"Pollo al limón con verduras asadas","tiempo_min":35,"kcal":480,"prot":42,"veg":2,"ingredientes":[{"item":"Supremas de pollo","cant":"2 (300 g)"}],"pasos":["Prendé el horno a 200 °C..."],"faltan":["limón"]}]`),
       };
