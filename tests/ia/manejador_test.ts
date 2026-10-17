@@ -95,20 +95,20 @@ Deno.test("IA saturada → 503 con mensaje", async () => {
   assertEquals((await manejar(pedir({ espacio_id: ESP, tarea: "estimar", datos: { texto: "x" } }), d)).status, 503);
 });
 
-Deno.test("recetas: usa el modelo de recetas, limpia y devuelve 5", async () => {
+Deno.test("recetas: usa el modelo de recetas, limpia y devuelve 3", async () => {
   const receta = (i: number) => ({ titulo: `Receta ${i}`, tiempo_min: "30", kcal: 500.4, prot: 40, veg: 1.3, ingredientes: [{ item: "Huevos", cant: "4" }, "Sal"], pasos: ["1. Batí", "2) Cociná"], faltan: ["limón"] });
   const { d, pedidos } = deps({ respuesta: "Acá van:\n```json\n" + JSON.stringify([1, 2, 3, 4, 5, 6].map(receta)) + "\n```" });
   const r = await manejar(pedir({ espacio_id: ESP, tarea: "recetas", datos: { despensa: [{ nombre: "Huevos" }], objetivos: [{ nombre: "Cris", objetivo: "musculo", kcal: 2550, prot: 140 }, { nombre: "Clara", objetivo: "mantener" }], filtros: ["rapida", "inventado"], evitar: ["Tortilla"] } }), d);
   assertEquals(r.status, 200);
   const j = await r.json();
-  assertEquals(j.resultado.length, 5);
+  assertEquals(j.resultado.length, 3);
   assertEquals(j.resultado[0].pasos[0], "Batí");
   assertEquals(j.resultado[0].veg, 1.5);
   assertEquals(j.resultado[0].ingredientes[1], { item: "Sal", cant: "" });
   const p = pedidos[0] as { model: string; messages: { content: { text: string }[] }[] };
   assertEquals(p.model, "claude-haiku-5-5");
   const txt = p.messages[0].content[0].text;
-  assertMatch(txt, /para 2 personas/); assertMatch(txt, /Solo recetas reales y conocidas/); assertMatch(txt, /ganar músculo/); assertMatch(txt, /Rápidas/); assertMatch(txt, /Tortilla/);
+  assertMatch(txt, /para 2 personas/); assertMatch(txt, /Solo recetas reales y conocidas de la cocina uruguaya/); assertMatch(txt, /3 recetas/); assertMatch(txt, /ganar músculo/); assertMatch(txt, /Rápidas/); assertMatch(txt, /Tortilla/);
 });
 
 Deno.test("foto: arma el bloque de imagen y valida el contenido", () => {

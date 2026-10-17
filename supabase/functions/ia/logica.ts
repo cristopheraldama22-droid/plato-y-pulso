@@ -146,7 +146,7 @@ Si en la foto no se ve comida, respondé {"texto":"","kcal":0,"prot":0,"veg":0,"
       const restr = lista<string>(datos.restricciones, 4).map(String).filter((r) => RESTRICCIONES[r]);
       const alergias = limpiar(datos.alergias, 300);
       const reglaRestr = restr.length || alergias
-        ? `- RESTRICCIONES OBLIGATORIAS (alguien de la casa las tiene; las 5 recetas tienen que respetarlas todas, sin excepción y sin "opcional"): ${[...restr.map((r) => RESTRICCIONES[r]), ...(alergias ? [`no usar: ${q(alergias)} (alergias o intolerancias)`] : [])].join("; ")}.`
+        ? `- RESTRICCIONES OBLIGATORIAS (alguien de la casa las tiene; las 3 recetas tienen que respetarlas todas, sin excepción y sin "opcional"): ${[...restr.map((r) => RESTRICCIONES[r]), ...(alergias ? [`no usar: ${q(alergias)} (alergias o intolerancias)`] : [])].join("; ")}.`
         : "- Sin restricciones alimentarias; el criterio es que sean saludables.";
       const mus = objetivos.some((o) => o.musculo);
       const conRef = objetivos.some((o) => o.kcal);
@@ -154,25 +154,26 @@ Si en la foto no se ve comida, respondé {"texto":"","kcal":0,"prot":0,"veg":0,"
         ? objetivos.map((o) => `${o.nombre}: ${o.musculo ? "ganar músculo" : "mantenerse y comer mejor"}${o.kcal ? `, referencia diaria ~${Math.round(o.kcal)} kcal y ~${Math.round(o.prot ?? 0)} g de proteína` : ""}`).join("; ")
         : "mantenerse y comer mejor";
       return {
-        modelo: cfg.modeloRecetas, maxTokens: 6000,
-        contenido: texto(`Sos un equipo de nutricionista y cocinero en Uruguay. Proponé 5 recetas saludables para ${porciones} ${porciones === 1 ? "persona" : "personas"}.
+        modelo: cfg.modeloRecetas, maxTokens: 3600,
+        contenido: texto(`Sos un equipo de nutricionista y cocinero uruguayo. Proponé 3 recetas de cocina casera uruguaya, en versión saludable, para ${porciones} ${porciones === 1 ? "persona" : "personas"}.
 ${despensa.length ? "Usá sobre todo estos ingredientes que hay en la casa:\n" + despensa.map((x) => "- " + x.nombre + (x.cant ? ` (${x.cant})` : "")).join("\n") : 'La despensa está vacía: proponé recetas con ingredientes básicos y poné en "faltan" lo que haría falta comprar.'}
 Objetivos: ${objs}.
 ${mus ? "Al menos una persona quiere ganar músculo: priorizá 35 g de proteína o más por porción y energía suficiente (nada de platos muy bajos en calorías)." : "Objetivo general: mantenerse y comer mejor, platos equilibrados y saciantes, con buena cantidad de verdura."}
 ${filtros.length ? "Condiciones pedidas: " + filtros.join("; ") + "." : ""}
 ${antojo ? `Idea o antojo de la casa: ${q(antojo)}. Tenelo en cuenta.` : ""}
 Reglas:
-- Solo recetas reales y conocidas: platos que existen y se cocinan en casas (cocina uruguaya y rioplatense o clásicos internacionales que cualquiera reconoce), con su nombre habitual. Nada de combinaciones inventadas, fusiones raras ni ingredientes que no van juntos.
+- Solo recetas reales y conocidas de la cocina uruguaya de todos los días, con su nombre habitual: lo que se cocina en una casa uruguaya (por ejemplo tarta de zapallitos o de acelga, pascualina, guiso de lentejas, buseca, puchero, estofado, milanesas al horno, pastel de carne, carne al horno con boniatos, pollo al horno, tortilla de papas, revuelto de zapallitos, ñoquis, tallarines con tuco, polenta con salsa, arroz con pollo, croquetas de arroz, ensalada completa). Nada de cocina asiática, mexicana, india ni de otros países que no sea habitual en Uruguay (salvo que el antojo lo pida), nada de combinaciones inventadas, fusiones raras ni ingredientes que no van juntos.
+- Saludables sin dejar de ser el plato de siempre: más verdura, carnes magras, horno o plancha antes que fritura, poca crema y manteca.
 - Técnicas, temperaturas, tiempos y cantidades realistas y probados; que alguien que cocina en casa pueda seguirla y le salga. Si con lo de la despensa no alcanza para una receta real, usá una receta real igual y poné en "faltan" lo que haga falta, antes que inventar.
-- Las 5 bien distintas entre sí: distinto tipo de plato (por ejemplo horno, salteado, guiso, ensalada completa, tarta o desayuno/merienda), distinto ingrediente principal y distinto método de cocción.
+- Las 3 bien distintas entre sí: distinto tipo de plato (por ejemplo horno, guiso, tarta, plancha o ensalada completa), distinto ingrediente principal y distinto método de cocción.
 - No repitas ni hagas variantes cercanas de estas recetas: ${evitar.length ? evitar.join("; ") : "(ninguna)"}.
 - Ingredientes que se consiguen en un supermercado uruguayo, con nombres locales (morrón, zapallito, boniato, choclo, nalga, suprema, etc.).
 ${conRef ? "- Que cada plato principal aporte aproximadamente entre un 25% y un 35% de esas referencias diarias por porción.\n" : ""}- Cantidades para ${porciones} porciones. Entre 4 y 7 pasos claros y concretos, de longitud media.
 - kcal, prot (gramos) y veg (porciones de verdura o fruta, puede ser .5) son aproximadas y por porción.
 - "faltan": ingredientes de la receta que no están en la lista (sin contar sal, pimienta, agua, aceite y especias comunes).${despensa.length ? " Máximo 3 por receta." : ""}
 ${reglaRestr}
-Respondé solo con un array JSON de 5 objetos con esta forma exacta:
-[{"titulo":"Pollo al limón con verduras asadas","tiempo_min":35,"kcal":480,"prot":42,"veg":2,"ingredientes":[{"item":"Supremas de pollo","cant":"2 (300 g)"}],"pasos":["Prendé el horno a 200 °C..."],"faltan":["limón"]}]`),
+Respondé solo con un array JSON de 3 objetos con esta forma exacta:
+[{"titulo":"Pollo al horno con boniatos y zanahorias","tiempo_min":50,"kcal":480,"prot":42,"veg":2,"ingredientes":[{"item":"Supremas de pollo","cant":"2 (300 g)"}],"pasos":["Prendé el horno a 200 °C..."],"faltan":["limón"]}]`),
       };
     }
     case "compra": {
@@ -240,7 +241,7 @@ export function interpretar(tarea: Tarea, crudo: unknown): unknown {
     case "estimar_lote":
       return arr(crudo).filter((o) => o && num(o.kcal) !== null).map((o, idx) => ({ i: num(o.i) ?? idx, ...est(o) }));
     case "recetas": {
-      const lista5 = arr(crudo).filter((x) => x && x.titulo).slice(0, 5).map((x) => ({
+      const lista3 = arr(crudo).filter((x) => x && x.titulo).slice(0, 3).map((x) => ({
         titulo: limpiar(x.titulo, 120),
         tiempo_min: Math.max(1, Math.round(num(x.tiempo_min) ?? 30)),
         kcal: Math.max(0, Math.round(num(x.kcal) ?? 0)),
@@ -251,8 +252,8 @@ export function interpretar(tarea: Tarea, crudo: unknown): unknown {
         pasos: (Array.isArray(x.pasos) ? x.pasos : []).slice(0, 12).map((s: unknown) => limpiar(s, 600).replace(/^\d+[.)]\s*/, "")),
         faltan: (Array.isArray(x.faltan) ? x.faltan : []).slice(0, 8).map((s: unknown) => limpiar(s, 60)).filter(Boolean),
       }));
-      if (lista5.length < 3) throw new ErrorPedido("respuesta_invalida", "La IA no devolvió recetas completas.", 502);
-      return lista5;
+      if (lista3.length < 2) throw new ErrorPedido("respuesta_invalida", "La IA no devolvió recetas completas.", 502);
+      return lista3;
     }
     case "ticket": {
       const o = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
